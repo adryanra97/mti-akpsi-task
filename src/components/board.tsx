@@ -53,6 +53,8 @@ export function DepartureBoard({ rows, caption, animate = true }: { rows: BoardR
                 scope="col"
                 className={cx(
                   "font-narrow border-b border-board-line px-2 py-2.5 font-semibold tracking-wide first:pl-4 last:pr-4 sm:px-3 sm:first:pl-5 sm:last:pr-5",
+                  h === "Jadwal" && "hidden sm:table-cell",
+                  h === "Rilis" && "max-sm:pl-4",
                   h === "Layanan" && "hidden md:table-cell",
                   h === "Cycle" && "hidden text-right sm:table-cell",
                 )}
@@ -69,13 +71,13 @@ export function DepartureBoard({ rows, caption, animate = true }: { rows: BoardR
               "whitespace-nowrap border-b border-board-line px-2 py-2.5 align-middle first:pl-4 last:pr-4 sm:px-3 sm:first:pl-5 sm:last:pr-5";
             const content = (
               <>
-                <td className={cell}>
+                <td className={cx(cell, "hidden sm:table-cell")}>
                   <span className="flap" style={d}>
                     {r.time}
                   </span>
                   <span className="ml-2 hidden text-[12.5px] text-board-ink-2 sm:inline">{r.date}</span>
                 </td>
-                <td className={cell}>
+                <td className={cx(cell, "max-sm:pl-4")}>
                   {r.href ? (
                     <Link
                       href={r.href}

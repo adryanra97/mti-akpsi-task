@@ -83,7 +83,7 @@ export default async function IncidentPage({ params, searchParams }: { params: P
         }
       />
       <Stepper steps={steps} current={current} />
-      <div className="mt-5">
+      <div className="mt-3">
         <StatusHistory title="Status kasus insiden" history={inc.history} labels={INCIDENT_STATUS_LABEL} states={STATES} />
       </div>
 
@@ -103,6 +103,22 @@ export default async function IncidentPage({ params, searchParams }: { params: P
       )}
 
       <div className="mt-6 grid gap-6">
+        {/* Kasus yang sudah terdokumentasi: hasil akhirnya tampil paling atas. */}
+        {documented && (
+          <Panel title="Laporan insiden" description={`Disimpan ${fmtDate(inc.closedAt, true)}`} actions={<CopySummary text={summaryText(inc)} />}>
+            <KeyValue
+              items={[
+                ["Jalur akhir", notReproduced ? "Belum tereproduksi (perlu kalibrasi ulang model)" : inc.needsEscalation ? "Perlu eskalasi ke Technical Lead" : "Mitigasi ditemukan"],
+                ["Verdict sebelum", inc.repro ? <VerdictBadge key="v" verdict={inc.repro.verdict.status} size="sm" /> : "–"],
+                ["Verdict sesudah", selectedMitigation(inc) ? <VerdictBadge key="a" verdict={selectedMitigation(inc)!.result.verdict.status} size="sm" /> : "–"],
+                ["Mitigasi terpilih", selectedMitigation(inc)?.label ?? "–"],
+                ["Waktu deteksi", `${fmtDate(d.detectedAt, true)} WIB`],
+                ["Akar masalah teridentifikasi", inc.rootCauseAt ? `${fmtDate(inc.rootCauseAt, true)} WIB` : "–"],
+                ["MTTR (deteksi ke akar masalah)", mttrMinutes(inc) ? `${mttrMinutes(inc)} menit` : "–"],
+              ]}
+            />
+          </Panel>
+        )}
         <Panel title="Data insiden" description={`Dicatat oleh ${inc.createdBy}`}>
           <div className="grid gap-5 md:grid-cols-2">
             <KeyValue
@@ -134,17 +150,15 @@ export default async function IncidentPage({ params, searchParams }: { params: P
             )
           ) : (
             <div className="grid gap-5">
-              <div className={cx("rounded-lg border px-4 py-3", inc.repro.statusReproduksi === "Tereproduksi" ? "border-fail/40 bg-fail-soft" : "border-na/40 bg-na-soft")}>
-                <p className={cx("text-[22px] font-semibold", inc.repro.statusReproduksi === "Tereproduksi" ? "text-fail" : "text-na")}>
-                  {inc.repro.statusReproduksi === "Tereproduksi" ? "Insiden akan terjadi lagi pada spesifikasi saat ini" : "Insiden belum tereproduksi"}
-                </p>
-                <p className="mt-0.5 text-[14px] text-ink-2">
-                  {inc.repro.statusReproduksi === "Tereproduksi"
-                    ? "Lanjutkan dengan menguji opsi mitigasi."
-                    : "Rekomendasi: kalibrasi ulang model digital twin dengan data periode insiden. Laporan tetap dapat disusun."}
-                </p>
-              </div>
-              <VerdictHero result={inc.repro} title="Verdict pada spesifikasi saat ini" />
+              <VerdictHero
+                result={inc.repro}
+                title={inc.repro.statusReproduksi === "Tereproduksi" ? "Tereproduksi: insiden akan terjadi lagi pada spesifikasi saat ini" : "Insiden belum tereproduksi pada digital twin"}
+              />
+              {inc.repro.statusReproduksi !== "Tereproduksi" && (
+                <Notice tone="info" title="Rekomendasi">
+                  Kalibrasi ulang model digital twin dengan data periode insiden. Laporan tetap dapat disusun.
+                </Notice>
+              )}
               {inc.repro.kemungkinanAkarMasalah.length > 0 && (
                 <div>
                   <h3 className="text-[14px] font-semibold">Kemungkinan akar masalah</h3>
@@ -225,21 +239,6 @@ export default async function IncidentPage({ params, searchParams }: { params: P
           </Notice>
         )}
 
-        {documented && (
-          <Panel title="Laporan insiden" description={`Disimpan ${fmtDate(inc.closedAt, true)}`} actions={<CopySummary text={summaryText(inc)} />}>
-            <KeyValue
-              items={[
-                ["Jalur akhir", notReproduced ? "Belum tereproduksi (perlu kalibrasi ulang model)" : inc.needsEscalation ? "Perlu eskalasi ke Technical Lead" : "Mitigasi ditemukan"],
-                ["Verdict sebelum", inc.repro ? <VerdictBadge key="v" verdict={inc.repro.verdict.status} size="sm" /> : "–"],
-                ["Verdict sesudah", selectedMitigation(inc) ? <VerdictBadge key="a" verdict={selectedMitigation(inc)!.result.verdict.status} size="sm" /> : "–"],
-                ["Mitigasi terpilih", selectedMitigation(inc)?.label ?? "–"],
-                ["Waktu deteksi", `${fmtDate(d.detectedAt, true)} WIB`],
-                ["Akar masalah teridentifikasi", inc.rootCauseAt ? `${fmtDate(inc.rootCauseAt, true)} WIB` : "–"],
-                ["MTTR (deteksi ke akar masalah)", mttrMinutes(inc) ? `${mttrMinutes(inc)} menit` : "–"],
-              ]}
-            />
-          </Panel>
-        )}
       </div>
     </>
   );

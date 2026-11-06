@@ -49,7 +49,7 @@ export function SettingsForm({
           <legend className="sr-only">Mode analisis</legend>
           <div className="grid gap-2 md:grid-cols-2">
             {[
-              { v: "demo", t: "Demo", b: "Digital twin bawaan dengan rencana, estimasi, dan narasi deterministik. Tanpa API key dan tanpa biaya." },
+              { v: "demo", t: "Demo", b: "Digital twin SimPy tetap berjalan; rencana, estimasi, dan narasi memakai templat deterministik. Tanpa API key dan tanpa biaya." },
               { v: "llm", t: "LLM", b: "Rencana analisis, estimasi penalaran, dan narasi verdict disusun oleh model pilihan. Data disamarkan sebelum dikirim." },
             ].map((o) => (
               <label

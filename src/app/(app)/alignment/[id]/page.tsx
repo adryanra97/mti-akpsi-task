@@ -113,6 +113,62 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
     ...(s.decision === "LanjutPromosi" ? [{ label: "Sign-off", detail: "Project/Technical Manager" }] : []),
   ];
 
+  // Verdict, sumber daya pembatas, dan narasi tampil lebih dulu bila sudah ada hasil (NFR-08).
+  const resultFirst = Boolean(run) && (s.status === "Peninjauan" || closed);
+
+  const paramsPanel = (
+    <Panel
+      id="parameter"
+      title="Parameter analisis"
+      description={s.paramsBy ? `Diisi oleh ${s.paramsBy}${s.paramVersion ? `, versi ${s.paramVersion}` : ""}` : "Belum diisi"}
+    >
+      <Workbench
+        sessionId={s.id}
+        params={formParams}
+        hasSavedParams={!!s.params}
+        draftNote={!s.params && draft ? `Isian diambil dari parameter cycle sebelumnya untuk ${s.service}. Perbarui yang berubah pada versi uji ini.` : undefined}
+        canEdit={canEdit}
+        canRun={canRun}
+        needsRun={needsRun}
+        hasRuns={s.runs.length > 0}
+        waiting={s.status === "MenungguHasil"}
+      />
+    </Panel>
+  );
+
+  const decisionSummary = s.decision ? (
+    <Panel title="Keputusan cycle" description={`Dicatat oleh ${s.decidedBy} pada ${fmtDate(s.decidedAt, true)}`}>
+      <KeyValue
+        items={[
+          ["Keputusan", DECISION_LABEL[s.decision]],
+          ["Ringkasan", s.decisionNotes],
+          [
+            "Tindak lanjut",
+            s.followUps?.length ? (
+              <ul className="list-disc pl-4">
+                {s.followUps.map((f, i) => (
+                  <li key={i}>{f}</li>
+                ))}
+              </ul>
+            ) : (
+              "–"
+            ),
+          ],
+        ]}
+      />
+      {signoff && (
+        <Link href={`/signoff/${signoff.id}`} className="mt-4 flex items-center gap-3 rounded-lg border border-line px-4 py-3 hover:bg-surface-2">
+          <FileSignature className="h-5 w-5 text-accent" aria-hidden />
+          <span className="flex-1">
+            <span className="block font-medium">Dokumen sign-off {signoff.code}</span>
+            <span className="block text-[13.5px] text-ink-3">{SIGNOFF_STATUS_LABEL[signoff.status]}</span>
+          </span>
+          <span className="text-ink-3" aria-hidden>›</span>
+        </Link>
+      )}
+    </Panel>
+  ) : null;
+
   return (
     <>
       <PageHeader
@@ -133,7 +189,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
 
       <Stepper steps={steps} current={Math.min(stepIndex, steps.length)} />
 
-      <div className="mt-5">
+      <div className="mt-3">
         <StatusHistory title="Status sesi" history={s.history} labels={SESSION_STATUS_LABEL} states={STATES} />
       </div>
 
@@ -147,7 +203,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
       )}
 
       <div className="mt-6 grid gap-6">
-        {s.status === "Terjadwal" ? (
+        {s.status === "Terjadwal" && (
           <Panel title="Sesi belum dibuka">
             <div className="flex flex-wrap items-center gap-4">
               <CalendarClock className="h-8 w-8 text-ink-3" aria-hidden />
@@ -158,31 +214,19 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
               {can(user.role, "alignment.schedule") && <OpenSessionButton id={s.id} />}
             </div>
           </Panel>
-        ) : (
-          <Panel
-            id="parameter"
-            title="Parameter analisis"
-            description={s.paramsBy ? `Diisi oleh ${s.paramsBy}${s.paramVersion ? `, versi ${s.paramVersion}` : ""}` : "Belum diisi"}
-          >
-            <Workbench
-              sessionId={s.id}
-              params={formParams}
-              hasSavedParams={!!s.params}
-              draftNote={!s.params && draft ? `Isian diambil dari parameter cycle sebelumnya untuk ${s.service}. Perbarui yang berubah pada versi uji ini.` : undefined}
-              canEdit={canEdit}
-              canRun={canRun}
-              needsRun={needsRun}
-              hasRuns={s.runs.length > 0}
-              waiting={s.status === "MenungguHasil"}
-            />
-          </Panel>
         )}
+
+        {/* Saat parameter sedang diisi, formulir adalah tugas utama sehingga tampil paling atas. */}
+        {!resultFirst && s.status !== "Terjadwal" && paramsPanel}
 
         {s.status === "MenungguHasil" && (
           <Notice tone="info" icon={<Info className="h-4 w-4 text-accent" />} title="Menunggu hasil Core Module">
             Permintaan analisis sudah diajukan. Bila halaman ditutup sebelum hasil diterima, ajukan ulang analisis dari panel parameter.
           </Notice>
         )}
+
+        {/* Sesi yang sudah diputuskan: hasil akhirnya dulu. */}
+        {closed && s.decision && decisionSummary}
 
         {run && (
           <div id="hasil" className="grid scroll-mt-6 gap-6">
@@ -192,6 +236,26 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
               </Notice>
             )}
             <VerdictHero result={run} />
+
+            {/* Keputusan adalah tindakan utama Technical Lead saat peninjauan: diletakkan tepat setelah verdict. */}
+            {s.status === "Peninjauan" &&
+              (can(user.role, "alignment.decide") ? (
+                <Panel id="keputusan" title="Catat keputusan cycle" description="Diisi Technical Lead setelah verdict ditinjau bersama peserta alignment meeting.">
+                  <DecisionForm sessionId={s.id} verdict={run.verdict.status} defaultFollowUps={run.verdict.syarat.join("\n")} />
+                </Panel>
+              ) : (
+                <Notice tone="info" icon={<Info className="h-4 w-4 text-accent" />} title="Menunggu keputusan Technical Lead">
+                  Verdict sudah tersedia untuk ditinjau di alignment meeting. Keputusan cycle dicatat oleh Technical Lead.
+                  {canEdit && (
+                    <>
+                      {" "}
+                      <a href="#parameter" className="font-medium text-accent hover:underline">
+                        Uji varian parameter lain
+                      </a>
+                    </>
+                  )}
+                </Notice>
+              ))}
 
             <ResultDetails r={run} />
 
@@ -221,49 +285,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
           </div>
         )}
 
-        {run && s.status === "Peninjauan" &&
-          (can(user.role, "alignment.decide") ? (
-            <Panel title="Catat keputusan cycle" description="Diisi Technical Lead setelah verdict ditinjau bersama peserta alignment meeting.">
-              <DecisionForm sessionId={s.id} verdict={run.verdict.status} defaultFollowUps={run.verdict.syarat.join("\n")} />
-            </Panel>
-          ) : (
-            <Notice tone="info" icon={<Info className="h-4 w-4 text-accent" />} title="Menunggu keputusan Technical Lead">
-              Verdict sudah tersedia untuk ditinjau di alignment meeting. Keputusan cycle dicatat oleh Technical Lead.
-            </Notice>
-          ))}
-
-        {closed && s.decision && (
-          <Panel title="Keputusan cycle" description={`Dicatat oleh ${s.decidedBy} pada ${fmtDate(s.decidedAt, true)}`}>
-            <KeyValue
-              items={[
-                ["Keputusan", DECISION_LABEL[s.decision]],
-                ["Ringkasan", s.decisionNotes],
-                [
-                  "Tindak lanjut",
-                  s.followUps?.length ? (
-                    <ul className="list-disc pl-4">
-                      {s.followUps.map((f, i) => (
-                        <li key={i}>{f}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    "–"
-                  ),
-                ],
-              ]}
-            />
-            {signoff && (
-              <Link href={`/signoff/${signoff.id}`} className="mt-4 flex items-center gap-3 rounded-lg border border-line px-4 py-3 hover:bg-surface-2">
-                <FileSignature className="h-5 w-5 text-accent" aria-hidden />
-                <span className="flex-1">
-                  <span className="block font-medium">Dokumen sign-off {signoff.code}</span>
-                  <span className="block text-[13.5px] text-ink-3">{SIGNOFF_STATUS_LABEL[signoff.status]}</span>
-                </span>
-                <span className="text-ink-3" aria-hidden>›</span>
-              </Link>
-            )}
-          </Panel>
-        )}
+        {resultFirst && paramsPanel}
       </div>
     </>
   );

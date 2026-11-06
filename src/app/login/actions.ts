@@ -12,7 +12,7 @@ export interface LoginState {
   username?: string;
 }
 
-const GENERIC = "Nama pengguna atau kata sandi tidak cocok. Periksa lalu coba lagi.";
+const GENERIC = "Kata sandi tidak cocok untuk peran ini. Periksa lalu coba lagi.";
 
 export async function login(_: LoginState, form: FormData): Promise<LoginState> {
   const username = String(form.get("username") ?? "").trim().toLowerCase().slice(0, 64);
@@ -22,7 +22,7 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   if (authConfigProblems().length) {
     return { error: "Login belum dapat dipakai karena konfigurasi server belum lengkap.", username };
   }
-  if (!username || !password) return { error: "Isi nama pengguna dan kata sandi.", username };
+  if (!username || !password) return { error: !username ? "Pilih peran Anda terlebih dahulu." : "Isi kata sandi.", username };
 
   const h = await headers();
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "lokal";

@@ -211,14 +211,14 @@ export function VerdictHero({ result, title = "Verdict Core Module" }: { result:
     <section className={cx("verdict-reveal overflow-hidden rounded-xl border bg-surface", t.border)} aria-labelledby={`verdict-${result.idPermintaan}`}>
       <div className={cx("flex flex-wrap items-center gap-4 px-5 py-5 sm:px-6", t.bg)}>
         <VerdictIcon verdict={v.status} className={cx("h-11 w-11 shrink-0", t.text)} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[12rem] flex-1">
           <p className="text-[13.5px] text-ink-2">{title}</p>
           <h2 id={`verdict-${result.idPermintaan}`} data-verdict-title className={cx("text-[30px] font-bold leading-tight sm:text-[36px]", t.text)}>
             {VERDICT_LABEL[v.status]}
           </h2>
         </div>
         {result.sumberDayaPembatas && (
-          <div className="rounded-lg bg-surface/70 px-4 py-2.5">
+          <div className="w-full rounded-lg bg-surface/70 px-4 py-2.5 sm:w-auto">
             <p className="text-[12.5px] text-ink-3">Sumber daya pembatas</p>
             <p className="text-[17px] font-semibold">{LIMITING_LABEL[result.sumberDayaPembatas]}</p>
           </div>

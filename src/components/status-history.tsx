@@ -1,4 +1,5 @@
 import type { StatusEvent } from "@/lib/types";
+import { History } from "lucide-react";
 import { cx } from "./ui";
 import { fmtDate } from "@/lib/format";
 
@@ -15,11 +16,17 @@ export function StatusHistory<S extends string>({
   title: string;
 }) {
   const current = history.at(-1)?.status;
+  // Ringkas secara bawaan: status saat ini sudah tampil di header dan stepper, jadi detail state machine
+  // dan riwayatnya baru tampil saat dibuka (progressive disclosure, tanpa informasi ganda).
   return (
-    <details className="group rounded-xl border border-line bg-surface">
-      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
-        <span className="font-semibold">{title}</span>
-        <ol className="flex flex-1 flex-wrap gap-1" aria-label="Status pada state machine">
+    <details className="group">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded text-[13.5px] text-accent hover:underline">
+        <History className="h-3.5 w-3.5" aria-hidden />
+        <span className="group-open:hidden">{title}: lihat riwayat ({history.length} perubahan)</span>
+        <span className="hidden group-open:inline">Sembunyikan riwayat {title.toLowerCase()}</span>
+      </summary>
+      <div className="mt-2 rounded-xl border border-line bg-surface px-5 py-4">
+        <ol className="flex flex-wrap gap-1" aria-label="Status pada state machine">
           {states.map((s) => {
             const reached = history.some((h) => h.status === s);
             return (
@@ -36,24 +43,22 @@ export function StatusHistory<S extends string>({
             );
           })}
         </ol>
-        <span className="text-[13.5px] text-accent group-open:hidden">Riwayat</span>
-        <span className="hidden text-[13.5px] text-accent group-open:inline">Sembunyikan</span>
-      </summary>
-      <ol className="border-t border-line px-5 py-3">
-        {history.map((h, i) => (
-          <li key={i} className="grid grid-cols-[110px_1fr] gap-3 py-1.5 text-[13.5px] sm:grid-cols-[150px_1fr]">
-            <span className="text-ink-3">{fmtDate(h.at, true)}</span>
-            <span>
-              <span className="font-medium">{labels[h.status]}</span>
-              <span className="text-ink-2">
-                {" "}
-                oleh {h.by}
-                {h.note ? `. ${h.note}` : ""}
+        <ol className="mt-3 border-t border-line pt-2">
+          {history.map((h, i) => (
+            <li key={i} className="grid grid-cols-[110px_1fr] gap-3 py-1.5 text-[13.5px] sm:grid-cols-[150px_1fr]">
+              <span className="text-ink-3">{fmtDate(h.at, true)}</span>
+              <span>
+                <span className="font-medium">{labels[h.status]}</span>
+                <span className="text-ink-2">
+                  {" "}
+                  oleh {h.by}
+                  {h.note ? `. ${h.note}` : ""}
+                </span>
               </span>
-            </span>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      </div>
     </details>
   );
 }
