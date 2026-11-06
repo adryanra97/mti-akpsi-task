@@ -76,6 +76,13 @@ function BaselineVsSim({ r }: { r: AnalysisResult }) {
 export function ResultDetails({ r, showRunway = true }: { r: AnalysisResult; showRunway?: boolean }) {
   const manual = r.langkah.filter((l) => l.perluVerifikasiManual);
   const stopped = r.statusPermintaan === "Selesai" && r.alasanDihentikan;
+  const peak = peakSummary(r);
+  const metricCards = peak ? [
+    { label: "CPU puncak", value: peak.cpuPct, limit: r.kriteria.maxCpuPct, unit: "%", digits: 1 },
+    { label: "Memori puncak", value: peak.memPct, limit: r.kriteria.maxMemPct, unit: "%", digits: 1 },
+    { label: "Response time p95", value: peak.p95Ms, limit: r.kriteria.maxP95Ms, unit: " ms", digits: 0 },
+    { label: "Error rate", value: peak.errorRatePct, limit: r.kriteria.maxErrorRatePct, unit: "%", digits: 2 },
+  ] : [];
   return (
     <div className="grid gap-6">
       {r.peringatan.length > 0 && (
@@ -97,6 +104,39 @@ export function ResultDetails({ r, showRunway = true }: { r: AnalysisResult; sho
             ))}
           </ul>
         </Notice>
+      )}
+
+      {metricCards.length > 0 && (
+        <section aria-labelledby="quick-metrics-title">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.13em] text-accent">Performance snapshot</p>
+              <h2 id="quick-metrics-title" className="mt-1 text-[20px]">Indikator beban puncak</h2>
+            </div>
+            <p className="text-[12.5px] text-ink-3">Dibandingkan dengan kriteria penerimaan</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {metricCards.map((m) => {
+              const exceeds = m.value > m.limit;
+              const ratio = m.limit > 0 ? Math.min((m.value / m.limit) * 100, 100) : 0;
+              return (
+                <div key={m.label} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[13px] font-medium text-ink-2">{m.label}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${exceeds ? "bg-fail-soft text-fail" : "bg-pass-soft text-pass"}`}>
+                      {exceeds ? "Melebihi batas" : "Dalam batas"}
+                    </span>
+                  </div>
+                  <p className="mt-3 font-display text-[28px] font-bold leading-none">{fmtNum(m.value, m.digits)}{m.unit}</p>
+                  <p className="mt-2 text-[12.5px] text-ink-3">Batas ≤ {fmtNum(m.limit, m.digits)}{m.unit}</p>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sunken" role="meter" aria-label={m.label} aria-valuemin={0} aria-valuemax={Math.max(m.limit, m.value, 1)} aria-valuenow={m.value}>
+                    <div className={`h-full rounded-full ${exceeds ? "bg-fail" : "bg-pass"}`} style={{ width: `${ratio}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <Panel
