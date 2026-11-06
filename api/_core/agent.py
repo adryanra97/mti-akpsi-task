@@ -154,6 +154,7 @@ class LangkahAnalisis:
     pelanggaran: list = field(default_factory=list)
     status: str | None = None
     catatan: str = ""
+    diLuarRentang: str | None = None
 
     def keluaran(self) -> dict:
         """Mengubah langkah menjadi dictionary untuk HasilAnalisis.
@@ -163,7 +164,7 @@ class LangkahAnalisis:
         dict
             Semua field dataclass.
         """
-        return {k: getattr(self, k) for k in self.__dataclass_fields__}
+        return {k: getattr(self, k) for k in self.__dataclass_fields__ if k != "diLuarRentang"}
 
 
 class EstimatorPenalaran:
@@ -492,9 +493,15 @@ class AgenAnalisis:
         else:
             for lk in self.langkah:
                 if lk.skenario and not (model["tpsMinTerkalibrasi"] <= lk.skenario["tpsTarget"] <= model["tpsMaksTerkalibrasi"]):
-                    self.dihentikan = (f"{lk.deskripsi}: beban {lk.skenario['tpsTarget']} TPS di luar rentang terkalibrasi "
-                                       f"{model['tpsMinTerkalibrasi']} sampai {model['tpsMaksTerkalibrasi']} TPS.")
-                    break
+                    alasan = (f"{lk.deskripsi}: beban {lk.skenario['tpsTarget']:g} TPS di luar rentang terkalibrasi "
+                              f"{model['tpsMinTerkalibrasi']} sampai {model['tpsMaksTerkalibrasi']} TPS.")
+                    if lk.kunci.startswith("whatif"):
+                        # Varian what-if hanya eksplorasi: varian itu saja yang tidak dinilai,
+                        # beban normal dan puncak tetap dianalisis.
+                        lk.diLuarRentang = alasan
+                    else:
+                        self.dihentikan = alasan
+                        break
         if not self.dihentikan:
             t0 = time.time()
             yield {"type": "step", "id": "kalibrasi", "label": "Kalibrasi profil beban", "state": "run"}
@@ -510,6 +517,13 @@ class AgenAnalisis:
                 lk.catatan = self.dihentikan
                 self._jejak(sid, label, "Dihentikan", self.dihentikan, time.time())
                 yield {"type": "step", "id": sid, "label": label, "state": "skip", "note": self.dihentikan}
+                continue
+            if lk.diLuarRentang:
+                lk.statusLangkah = "Dihentikan"
+                lk.status = "TidakDapatDinilai"
+                lk.catatan = lk.diLuarRentang + " Varian ini tidak dinilai; langkah lain tetap dijalankan."
+                self._jejak(sid, label, "Dihentikan", lk.catatan, time.time())
+                yield {"type": "step", "id": sid, "label": label, "state": "skip", "note": lk.catatan}
                 continue
             t0 = time.time()
             yield {"type": "step", "id": sid, "label": label, "state": "run"}
@@ -1003,7 +1017,13 @@ class AgenAnalisis:
                               f"{self.kapasitas['kapasitasMaksTps'] / self.p['parameter']['peakTps']:.1f}x beban puncak.")
             for l in self.langkah:
                 if l.kunci.startswith("whatif") and l.status:
-                    alasan.append(f"{l.deskripsi}: {LABEL_VERDICT[l.status]}" + (f" ({l.pelanggaran[0]})" if l.pelanggaran else "") + ".")
+                    if l.diLuarRentang:
+                        m = self.reg["model"]
+                        alasan.append(f"{l.deskripsi}: Tidak Dapat Dinilai (di luar rentang terkalibrasi "
+                                      f"{m['tpsMinTerkalibrasi']} sampai {m['tpsMaksTerkalibrasi']} TPS).")
+                        syarat.append(f"{l.deskripsi} tidak dinilai; kalibrasi model pada beban lebih tinggi bila skenario ini perlu dinilai.")
+                    else:
+                        alasan.append(f"{l.deskripsi}: {LABEL_VERDICT[l.status]}" + (f" ({l.pelanggaran[0]})" if l.pelanggaran else "") + ".")
         if getattr(self, "_elk_mati", False):
             syarat.append(f"Baseline memakai data tersimpan tanggal {self.metrik['tanggalPengambilan']}.")
         self.verdict = {"status": status, "alasan": alasan, "syarat": syarat, "narasi": "", "waktuDitetapkan": iso(datetime.now(timezone.utc))}

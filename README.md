@@ -57,7 +57,7 @@ Aturan penjurusan (JalurPenjurusan):
 
 - Langkah dalam cakupan model memakai **DigitalTwin**.
 - Komponen di luar cakupan model (misalnya Kafka atau Redis pada perubahan konfigurasi, atau insiden tipe lain) memakai **EstimasiPenalaran** bila skor keyakinan dan kesepakatan sampel memenuhi ambang. Angkanya ditandai perlu verifikasi manual dan verdict paling tinggi Lolos Bersyarat. Bila ambang tidak terpenuhi, langkah kembali ke **FallbackDigitalTwin**.
-- Beban di luar rentang TPS terkalibrasi, atau model tidak aktif, menghentikan analisis dengan verdict **Tidak Dapat Dinilai**.
+- Beban normal atau puncak di luar rentang TPS terkalibrasi, atau model tidak aktif, menghentikan analisis dengan verdict **Tidak Dapat Dinilai**. Varian what-if di luar rentang hanya menandai varian itu sendiri sebagai Tidak Dapat Dinilai; beban normal dan puncak tetap dinilai.
 - Uji what-if adalah pengali beban **normal** (2×, 3×, 5×, 10×).
 
 Setiap hasil menampilkan versi dan tanggal kalibrasi model, dan verdict, sumber daya pembatas, serta narasi tampil paling atas.

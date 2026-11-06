@@ -117,6 +117,7 @@ export function Workbench({
   needsRun,
   hasRuns,
   waiting,
+  range,
 }: {
   sessionId: string;
   params: AlignmentParams;
@@ -127,11 +128,14 @@ export function Workbench({
   needsRun: boolean;
   hasRuns: boolean;
   waiting: boolean;
+  range: { min: number; max: number } | null;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(!hasSavedParams && canEdit);
   const [state, action, pending] = useActionState<FormState, FormData>(saveParams.bind(null, sessionId), {});
   const run = useCoreRun();
+  // Nilai beban yang sedang diketik, untuk peringatan rentang kalibrasi sebelum analisis diajukan.
+  const [live, setLive] = useState({ normal: params.normalTps, peak: params.peakTps, whatIf: params.whatIf });
   const lastSaved = useRef<number | undefined>(undefined);
   const errorRef = useRef<HTMLDivElement>(null);
   const e = state.errors ?? {};
@@ -219,7 +223,16 @@ export function Workbench({
 
   const v = (n: number) => n;
   return (
-    <form onSubmit={submitWith(action)} noValidate className="grid gap-5">
+    <form
+      onSubmit={submitWith(action)}
+      onChange={(ev) => {
+        const f = new FormData(ev.currentTarget);
+        const n = (k: string) => Number(String(f.get(k) ?? "").replace(",", "."));
+        setLive({ normal: n("normalTps"), peak: n("peakTps"), whatIf: f.getAll("whatIf").map(Number) });
+      }}
+      noValidate
+      className="grid gap-5"
+    >
       {draftNote && <Notice tone="info">{draftNote}</Notice>}
       {state.error && (
         <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg border border-fail/30 bg-fail-soft px-4 py-3 text-[14px] outline-none">
@@ -259,8 +272,29 @@ export function Workbench({
             ))}
           </div>
           <p className="mt-1 text-[13px] text-ink-3">
-            Setiap varian dijalankan pada digital twin. Bila beban varian berada di luar rentang terkalibrasi model, analisis dihentikan dengan status Tidak Dapat Dinilai.
+            Setiap varian dijalankan pada digital twin
+            {range ? `, yang terkalibrasi untuk ${fmtNum(range.min)} sampai ${fmtNum(range.max)} TPS` : ""}. Varian di luar rentang itu ditandai Tidak Dapat
+            Dinilai tanpa menghentikan analisis beban normal dan puncak.
           </p>
+          {range && (() => {
+            const out = live.whatIf.filter((m) => live.normal > 0 && live.normal * m > range.max);
+            const peakOut = live.peak > range.max || live.normal > range.max;
+            if (!out.length && !peakOut) return null;
+            return (
+              <div className="mt-2 rounded-lg border border-cond/40 bg-cond-soft px-3 py-2 text-[13.5px]" role="status">
+                {peakOut && (
+                  <p>
+                    <span className="font-medium">Beban normal atau puncak melebihi {fmtNum(range.max)} TPS.</span> Seluruh analisis akan berstatus Tidak Dapat Dinilai.
+                  </p>
+                )}
+                {out.length > 0 && (
+                  <p>
+                    {out.map((m) => `${fmtNum(m)}× normal (${fmtNum(live.normal * m)} TPS)`).join(", ")} di luar rentang model; varian ini tidak akan dinilai.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </Group>
 

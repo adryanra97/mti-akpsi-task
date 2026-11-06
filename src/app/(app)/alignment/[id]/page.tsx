@@ -11,6 +11,7 @@ import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
 import { getSession, getSignoff, listSessions } from "@/lib/data";
 import { defaultParams, latestResult, peakSummary } from "@/lib/domain";
+import { serviceEntry } from "@/lib/services";
 import { KeyValue, Notice, PageHeader, Panel, Tag, cx } from "@/components/ui";
 import { VerdictBadge, VerdictHero } from "@/components/verdict";
 import { ResultDetails } from "@/components/result-details";
@@ -177,6 +178,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
   ];
 
   // Verdict, sumber daya pembatas, dan narasi tampil lebih dulu bila sudah ada hasil (NFR-08).
+  const twin = serviceEntry(s.service)?.model;
   const resultFirst = Boolean(run) && (s.status === "Peninjauan" || closed);
 
   const paramsPanel = (
@@ -195,6 +197,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
         needsRun={needsRun}
         hasRuns={s.runs.length > 0}
         waiting={s.status === "MenungguHasil"}
+        range={twin?.statusAktif ? { min: twin.tpsMinTerkalibrasi, max: twin.tpsMaksTerkalibrasi } : null}
       />
     </Panel>
   );
