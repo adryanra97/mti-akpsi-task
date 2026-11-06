@@ -95,7 +95,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
             <Input type="date" name="sampai" defaultValue={filter.to} className="mt-1" />
           </label>
           <div className="flex gap-2">
-            <button type="submit" className="inline-flex h-10 items-center rounded-lg bg-accent px-3.5 text-[14px] font-medium text-accent-ink hover:bg-accent-hover">
+            <button type="submit" className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-[14px] font-semibold text-primary-ink hover:bg-primary-hover">
               Terapkan
             </button>
             {active && (

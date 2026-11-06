@@ -1,32 +1,40 @@
 @import "tailwindcss";
-@import "@fontsource-variable/instrument-sans/wdth.css";
-@import "@fontsource-variable/bricolage-grotesque/index.css";
+@import "@fontsource-variable/archivo/wdth.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --bg: #f2f4f8;
+  --bg: #eef0f2;
   --surface: #ffffff;
-  --surface-2: #f7f8fb;
-  --sunken: #eceff5;
-  --ink: #172033;
-  --ink-2: #47536a;
-  --ink-3: #66718a;
-  --line: #dde2ea;
-  --line-strong: #c5ccd8;
-  --accent: #2d4fd8;
-  --accent-hover: #2440b8;
-  --accent-soft: #e8edff;
+  --surface-2: #f6f7f8;
+  --sunken: #e6e9ec;
+  --ink: #0e141b;
+  --ink-2: #3f4a57;
+  --ink-3: #5d6876;
+  --line: #d7dce2;
+  --line-strong: #bcc4cd;
+  --accent: #4433d6;
+  --accent-hover: #3626b8;
+  --accent-soft: #ecebfd;
   --accent-ink: #ffffff;
-  --pass: #157a4b;
-  --pass-soft: #e2f3e9;
-  --cond: #9a5800;
-  --cond-soft: #fff0d9;
-  --fail: #be3329;
-  --fail-soft: #fde7e5;
-  --na: #556076;
-  --na-soft: #e9ecf2;
-  --focus: #2d4fd8;
+  --primary: #0e141b;
+  --primary-hover: #26303b;
+  --primary-ink: #ffffff;
+  --board: #0e141b;
+  --board-2: #18212b;
+  --board-line: #2a3542;
+  --board-ink: #eef1f4;
+  --board-ink-2: #a3aebb;
+  --amber: #ffb547;
+  --pass: #137547;
+  --pass-soft: #def2e6;
+  --cond: #9a5500;
+  --cond-soft: #fff0d6;
+  --fail: #bd2f25;
+  --fail-soft: #fde6e3;
+  --na: #536072;
+  --na-soft: #e6e9ee;
+  --focus: #4433d6;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
@@ -34,28 +42,37 @@
 }
 
 [data-theme="dark"] {
-  --bg: #0c1220;
-  --surface: #131b2b;
-  --surface-2: #182234;
-  --sunken: #0f1726;
-  --ink: #e6ebf4;
-  --ink-2: #adb7c9;
-  --ink-3: #8a95aa;
-  --line: #263149;
-  --line-strong: #34405b;
-  --accent: #7f98ff;
-  --accent-hover: #9aafff;
-  --accent-soft: #1c2752;
-  --accent-ink: #0c1220;
-  --pass: #50c48d;
-  --pass-soft: #12301f;
-  --cond: #f0b257;
-  --cond-soft: #392810;
-  --fail: #ff7d72;
-  --fail-soft: #3c1a18;
-  --na: #a6afc0;
-  --na-soft: #222b3b;
-  --focus: #9aafff;
+  --bg: #0a0f15;
+  --surface: #111821;
+  --surface-2: #161f2a;
+  --sunken: #0d131a;
+  --ink: #e8ecf1;
+  --ink-2: #aeb8c5;
+  --ink-3: #8a96a5;
+  --line: #243041;
+  --line-strong: #324055;
+  --accent: #9d93ff;
+  --accent-hover: #b4acff;
+  --accent-soft: #221d4d;
+  --accent-ink: #0a0f15;
+  --primary: #e8ecf1;
+  --primary-hover: #ffffff;
+  --primary-ink: #0a0f15;
+  --board: #05080c;
+  --board-2: #0f161e;
+  --board-line: #222d3a;
+  --board-ink: #eef1f4;
+  --board-ink-2: #a3aebb;
+  --amber: #ffb547;
+  --pass: #4fc48b;
+  --pass-soft: #11301f;
+  --cond: #f2b257;
+  --cond-soft: #38270f;
+  --fail: #ff7a6f;
+  --fail-soft: #3b1917;
+  --na: #a6afbf;
+  --na-soft: #212a38;
+  --focus: #b4acff;
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -63,8 +80,17 @@
 }
 
 @theme inline {
-  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bricolage Grotesque Variable", "Instrument Sans Variable", ui-sans-serif, sans-serif;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-ink: var(--primary-ink);
+  --color-board: var(--board);
+  --color-board-2: var(--board-2);
+  --color-board-line: var(--board-line);
+  --color-board-ink: var(--board-ink);
+  --color-board-ink-2: var(--board-ink-2);
+  --color-amber: var(--amber);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
@@ -109,7 +135,7 @@ body {
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.55;
-  font-feature-settings: "tnum" 1, "ss01" 1;
+  font-feature-settings: "tnum" 1;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -117,8 +143,61 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  letter-spacing: -0.015em;
-  line-height: 1.2;
+  font-stretch: 108%;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+h1 {
+  font-stretch: 116%;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+/* Lebar huruf Archivo: lebar untuk judul, sempit untuk papan promosi. */
+.font-wide {
+  font-stretch: 122%;
+}
+.font-narrow {
+  font-stretch: 76%;
+}
+
+/* Papan promosi: sel bergaya split-flap. */
+.flap {
+  position: relative;
+  display: inline-block;
+  padding: 0.2em 0.45em;
+  border-radius: 3px;
+  /* Dua bilah kartu split-flap; celahnya berada di belakang huruf agar tidak terbaca sebagai coretan. */
+  background: linear-gradient(to bottom, #222c38 0 calc(50% - 0.5px), #0a0e13 calc(50% - 0.5px) calc(50% + 0.5px), #1a222c calc(50% + 0.5px) 100%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04);
+  color: var(--board-ink);
+  font-stretch: 76%;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.6);
+}
+@keyframes flip-in {
+  0% {
+    transform: perspective(300px) rotateX(-88deg);
+    opacity: 0;
+  }
+  60% {
+    transform: perspective(300px) rotateX(12deg);
+    opacity: 1;
+  }
+  100% {
+    transform: perspective(300px) rotateX(0);
+  }
+}
+.board-row .flap {
+  animation: flip-in 520ms cubic-bezier(0.3, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+  transform-origin: 50% 50%;
 }
 
 :focus-visible {

@@ -7,9 +7,9 @@ export { clsx as cx };
 type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const btnBase =
-  "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 h-10 text-[14px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 rounded-md px-4 h-10 text-[14px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
 const btnVariants: Record<BtnVariant, string> = {
-  primary: "bg-accent text-accent-ink hover:bg-accent-hover",
+  primary: "bg-primary text-primary-ink hover:bg-primary-hover",
   secondary: "bg-surface text-ink border border-line-strong hover:bg-surface-2",
   ghost: "text-ink-2 hover:bg-sunken hover:text-ink",
   danger: "bg-fail text-white hover:opacity-90 dark:text-bg",
@@ -49,11 +49,11 @@ export function Panel({
   id?: string;
 }) {
   return (
-    <section id={id} className={clsx("rounded-xl border border-line bg-surface", className)}>
+    <section id={id} className={clsx("rounded-[10px] border border-line bg-surface", className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0">
-            {title && <h2 className="text-[17px] font-semibold">{title}</h2>}
+            {title && <h2 className="text-[17px]">{title}</h2>}
             {description && <p className="mt-0.5 text-[13.5px] text-ink-3">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -84,7 +84,7 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
-          <h1 className="text-[28px] font-semibold sm:text-[32px]">{title}</h1>
+          <h1 className="text-[30px] sm:text-[36px]">{title}</h1>
           {description && <p className="mt-1.5 text-ink-2">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}

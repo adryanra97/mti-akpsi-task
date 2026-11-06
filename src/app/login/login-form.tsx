@@ -12,8 +12,8 @@ export function LoginForm({ next, configProblems }: { next: string; configProble
   const [username, setUsername] = useState(state.username ?? "");
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 sm:p-7">
-      <h2 className="text-[22px] font-semibold">Masuk ke Dashboard</h2>
+    <div>
+      <h2 className="text-[26px]">Masuk</h2>
       {configProblems.length > 0 && (
         <div role="alert" className="mt-4 rounded-lg border border-cond/30 bg-cond-soft px-4 py-3 text-[14px]">
           <p className="font-medium">Login belum dikonfigurasi.</p>
@@ -37,13 +37,13 @@ export function LoginForm({ next, configProblems }: { next: string; configProble
                 aria-pressed={active}
                 className={cx(
                   "flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                  active ? "border-accent bg-accent-soft" : "border-line hover:border-line-strong hover:bg-surface-2",
+                  active ? "border-primary bg-surface ring-1 ring-primary" : "border-line bg-surface hover:border-line-strong",
                 )}
               >
                 <span
                   className={cx(
-                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold",
-                    active ? "bg-accent text-accent-ink" : "bg-sunken text-ink-2",
+                    "font-narrow mt-0.5 flex h-8 w-9 shrink-0 items-center justify-center rounded-[4px] text-[13px] font-bold tracking-wide",
+                    active ? "bg-primary text-primary-ink" : "bg-sunken text-ink-2",
                   )}
                   aria-hidden
                 >

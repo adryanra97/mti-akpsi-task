@@ -15,7 +15,7 @@ export function Stepper({ steps, current }: { steps: { label: string; detail?: s
                 className={cx(
                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[13px] font-semibold",
                   done && "border-pass bg-pass text-white dark:text-bg",
-                  active && "border-accent bg-accent text-accent-ink",
+                  active && "border-primary bg-primary text-primary-ink",
                   !done && !active && "border-line-strong text-ink-3",
                 )}
               >
