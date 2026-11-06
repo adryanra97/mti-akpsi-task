@@ -110,7 +110,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
         title={`${s.release} cycle ${s.cycleNo}`}
         description={
           <>
-            {s.service}, release candidate <span className="font-medium text-ink">{s.releaseCandidate}</span>, dari {s.envSource} ke {s.envTarget}. Jadwal {fmtDate(s.scheduledAt, true)} WIB.
+            {s.service}, versi uji <span className="font-medium text-ink">{s.releaseCandidate}</span>, dari {s.envSource} ke {s.envTarget}. Jadwal {fmtDate(s.scheduledAt, true)} WIB.
           </>
         }
         actions={<Tag tone={decided ? (s.decision === "promosi" ? "pass" : "neutral") : "warn"}>{s.decision === "promosi" ? "Lanjut promosi" : s.decision === "kembali_dev" ? "Kembali ke Dev" : SESSION_STATUS_LABEL[s.status]}</Tag>}

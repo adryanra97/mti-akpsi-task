@@ -296,5 +296,6 @@ export interface AppSettings {
   simulateElkDown: boolean;
   usdToIdr: number;
   cachedBaselines: Record<string, Baseline>;
-  piiScrubbed?: boolean;
+  /** Versi data contoh; data contoh lama diganti otomatis bila versinya lebih rendah. */
+  seedVersion?: number;
 }

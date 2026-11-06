@@ -38,14 +38,14 @@ export function ScheduleForm({
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Rilis" htmlFor="release" error={e.release}>
-          <Input id="release" name="release" key={`r-${service}`} defaultValue={sug?.release} placeholder="R3.9" aria-invalid={!!e.release} />
+          <Input id="release" name="release" key={`r-${service}`} defaultValue={sug?.release} placeholder="Rilis Dompet Digital" aria-invalid={!!e.release} />
         </Field>
         <Field label="Nomor sprint cycle" htmlFor="cycleNo" error={e.cycleNo} hint="Satu rilis umumnya melewati 5–7 cycle.">
           <Input id="cycleNo" name="cycleNo" key={`c-${service}`} type="number" min={1} defaultValue={sug?.cycleNo} aria-invalid={!!e.cycleNo} />
         </Field>
       </div>
-      <Field label="Release candidate" htmlFor="releaseCandidate" error={e.releaseCandidate}>
-        <Input id="releaseCandidate" name="releaseCandidate" placeholder="3.9.0-rc1" aria-invalid={!!e.releaseCandidate} />
+      <Field label="Versi uji (release candidate)" htmlFor="releaseCandidate" error={e.releaseCandidate}>
+        <Input id="releaseCandidate" name="releaseCandidate" placeholder="Kandidat 1 (v3.9)" aria-invalid={!!e.releaseCandidate} />
       </Field>
       <Field label="Jadwal alignment meeting (WIB)" htmlFor="scheduledAt" error={e.scheduledAt}>
         <Input id="scheduledAt" name="scheduledAt" type="datetime-local" defaultValue={defaultDate} aria-invalid={!!e.scheduledAt} />

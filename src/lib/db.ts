@@ -2,6 +2,8 @@ import "server-only";
 
 type Query = (text: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
 
+export const SEED_VERSION = 2;
+
 export const TABLES = ["sa_sessions", "sa_incidents", "sa_signoffs", "sa_reports", "sa_audit", "sa_settings"] as const;
 export type Table = (typeof TABLES)[number];
 
@@ -50,8 +52,8 @@ async function connect(): Promise<DbState> {
     );
   }
   const seeded = await state.query(`select data from sa_settings where id = 'app'`);
-  // Data contoh versi awal memuat nama orang; ganti seluruhnya dengan data contoh tanpa PII.
-  const legacy = seeded.length > 0 && !(seeded[0].data as { piiScrubbed?: boolean }).piiScrubbed;
+  // Data contoh versi lama (nama orang, kode rilis teknis) diganti seluruhnya dengan versi terbaru.
+  const legacy = seeded.length > 0 && ((seeded[0].data as { seedVersion?: number }).seedVersion ?? 0) < SEED_VERSION;
   if (legacy) {
     for (const t of TABLES) await state.query(`delete from ${t}`);
   }

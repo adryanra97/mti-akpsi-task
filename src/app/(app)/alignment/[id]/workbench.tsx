@@ -192,7 +192,7 @@ export function Workbench({
 
       <Group title="Perubahan pada release candidate">
         <Field label="Versi layanan" htmlFor="serviceVersion" error={e.serviceVersion}>
-          <Input id="serviceVersion" name="serviceVersion" defaultValue={sv("serviceVersion", p.serviceVersion)} aria-invalid={!!e.serviceVersion} placeholder="3.9.0-rc1" />
+          <Input id="serviceVersion" name="serviceVersion" defaultValue={sv("serviceVersion", p.serviceVersion)} aria-invalid={!!e.serviceVersion} placeholder="Kandidat 1 (v3.9)" />
         </Field>
         <Field
           label="Perubahan konfigurasi atau versi"

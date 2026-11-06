@@ -99,7 +99,7 @@ export function IncidentForm({ services, nowWib }: { services: { name: string; s
               </Select>
             </Field>
             <Field label="Rilis atau rollout terkait" htmlFor="release" error={e.release}>
-              <Input id="release" name="release" defaultValue={v.release} aria-invalid={!!e.release} placeholder="R3.8" />
+              <Input id="release" name="release" defaultValue={v.release} aria-invalid={!!e.release} placeholder="Rilis QRIS" />
             </Field>
             <Field label="Waktu deteksi (WIB)" htmlFor="detectedAt" error={e.detectedAt}>
               <Input id="detectedAt" name="detectedAt" type="datetime-local" defaultValue={v.detectedAt ?? nowWib} aria-invalid={!!e.detectedAt} />

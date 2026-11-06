@@ -5,6 +5,7 @@ import { listIncidents, listSessions, listSignoffs, todosFor } from "@/lib/data"
 import { ROLE_GOAL, ROLE_LABEL, SECTION_ACCESS } from "@/lib/roles";
 import { EmptyState, Notice, Panel, Tag } from "@/components/ui";
 import { DepartureBoard, type BoardRow, type BoardTone } from "@/components/board";
+import { Glossary } from "@/components/glossary";
 import { fmtRelative } from "@/lib/format";
 import { INCIDENT_TYPE_LABEL } from "@/lib/domain";
 import type { AlignmentSession, SignoffDoc, Verdict } from "@/lib/types";
@@ -106,6 +107,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
           )}
         </p>
       </section>
+
+      <div className="mt-6">
+        <Glossary />
+      </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <Panel title="Yang perlu Anda kerjakan" description={todos.length ? `${todos.length} tugas menunggu` : undefined} bodyClassName="p-0">

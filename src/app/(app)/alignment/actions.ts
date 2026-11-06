@@ -51,8 +51,8 @@ export async function scheduleSession(_: FormState, f: FormData): Promise<FormSt
   const date = String(f.get("scheduledAt") ?? "");
   const errors: Record<string, string> = {};
   if (!SERVICES.some((s) => s.name === service)) errors.service = "Pilih layanan.";
-  if (!release) errors.release = "Isi nama rilis, misalnya R3.9.";
-  if (!rc) errors.releaseCandidate = "Isi versi release candidate, misalnya 3.9.0-rc1.";
+  if (!release) errors.release = "Isi nama rilis, misalnya Rilis Dompet Digital.";
+  if (!rc) errors.releaseCandidate = "Isi versi yang diuji, misalnya Kandidat 1 (v3.9).";
   if (!Number.isInteger(cycleNo) || cycleNo < 1) errors.cycleNo = "Nomor cycle harus bilangan bulat 1 atau lebih.";
   if (!date) errors.scheduledAt = "Pilih tanggal dan jam alignment meeting.";
   const sessions = await listSessions();

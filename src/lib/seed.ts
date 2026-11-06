@@ -1,5 +1,7 @@
 import type { AlignmentParams, AlignmentSession, AuditEntry, Incident, SignoffDoc } from "./types";
 import { DEFAULT_SETTINGS } from "./settings-defaults";
+
+const SEED_VERSION = 2; // samakan dengan SEED_VERSION di db.ts
 import { assessIncident, runAlignment } from "./core/engine";
 import { defaultParams, limitationsFor, reportFromIncident, reportFromSession, reportFromSignoff } from "./domain";
 import { serviceModel } from "./core/twin";
@@ -41,38 +43,39 @@ export async function seed(insert: Insert) {
   const settings = { ...DEFAULT_SETTINGS };
   const ctx = (now: Date, userName: string) => ({ settings, userName, now });
 
-  const pg = "Payment Gateway API";
-  const ca = "Core Account Service";
-  const ns = "Notification Service";
-  const fs = "Fraud Scoring Service";
+  const pg = "Layanan Pembayaran";
+  const ca = "Layanan Rekening";
+  const ns = "Layanan Notifikasi";
+  const fs = "Layanan Deteksi Fraud";
 
   const plans: Plan[] = [
-    // R3.7 Core Account Service: lima cycle, cycle 5 dipromosikan dan sign-off disetujui
-    { service: ca, release: "R3.7", rc: "3.7.0-rc1", cycleNo: 1, daysAgo: 96, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "3.7.0-rc1", configChanges: "Upgrade driver JDBC; batas koneksi db-core-01.internal dinaikkan", dev: { testedTps: 35, p95Ms: 1350, cpuPct: 84, memPct: 71 } }), decision: "kembali_dev", notes: "Query saldo tanpa indeks memicu p95 tinggi.", followUps: ["Tambahkan indeks pada tabel mutasi", "Ulang performance test di Dev"] },
-    { service: ca, release: "R3.7", rc: "3.7.0-rc2", cycleNo: 2, daysAgo: 82, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "3.7.0-rc2", configChanges: "Indeks mutasi ditambahkan", dev: { testedTps: 35, p95Ms: 1250, cpuPct: 74, memPct: 66 } }), decision: "kembali_dev", notes: "p95 turun, tetapi masih di atas batas pada beban puncak.", followUps: ["Aktifkan cache saldo 30 detik"] },
-    { service: ca, release: "R3.7", rc: "3.7.0-rc3", cycleNo: 3, daysAgo: 68, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "3.7.0-rc3", configChanges: "Cache saldo aktif", prodSpec: { ...serviceModel(ca)!.defaultSpec, ramGb: 6 }, dev: { testedTps: 35, p95Ms: 610, cpuPct: 63, memPct: 62 } }), decision: "kembali_dev", notes: "Headroom memori tipis karena cache saldo; RAM Production perlu dinaikkan.", followUps: ["Konfirmasi alokasi RAM Production ke tim infrastruktur"] },
-    { service: ca, release: "R3.7", rc: "3.7.0-rc4", cycleNo: 4, daysAgo: 54, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "3.7.0-rc4", dev: { testedTps: 35, p95Ms: 520, cpuPct: 58, memPct: 60 } }), decision: "kembali_dev", notes: "Menunggu hasil UAT modul transfer.", followUps: ["Selesaikan UAT modul transfer"] },
-    { service: ca, release: "R3.7", rc: "3.7.0", cycleNo: 5, daysAgo: 40, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "3.7.0", prodSpec: { ...serviceModel(ca)!.defaultSpec, threadPool: 200 }, dev: { testedTps: 35, p95Ms: 470, cpuPct: 52, memPct: 58 } }), decision: "promosi", notes: "Semua indikator dalam kriteria. Disepakati lanjut ke Production.", followUps: ["Pantau p95 transfer 7 hari pertama"] },
+    // Rilis Mutasi (Layanan Rekening): lima cycle, cycle 5 dipromosikan dan sign-off disetujui
+    { service: ca, release: "Rilis Mutasi", rc: "Kandidat 1 (v3.7)", cycleNo: 1, daysAgo: 96, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "Kandidat 1 (v3.7)", configChanges: "Upgrade driver JDBC; batas koneksi db-core-01.internal dinaikkan", dev: { testedTps: 35, p95Ms: 1350, cpuPct: 84, memPct: 71 } }), decision: "kembali_dev", notes: "Query saldo tanpa indeks memicu p95 tinggi.", followUps: ["Tambahkan indeks pada tabel mutasi", "Ulang performance test di Dev"] },
+    { service: ca, release: "Rilis Mutasi", rc: "Kandidat 2 (v3.7)", cycleNo: 2, daysAgo: 82, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "Kandidat 2 (v3.7)", configChanges: "Indeks mutasi ditambahkan", dev: { testedTps: 35, p95Ms: 1250, cpuPct: 74, memPct: 66 } }), decision: "kembali_dev", notes: "p95 turun, tetapi masih di atas batas pada beban puncak.", followUps: ["Aktifkan cache saldo 30 detik"] },
+    { service: ca, release: "Rilis Mutasi", rc: "Kandidat 3 (v3.7)", cycleNo: 3, daysAgo: 68, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "Kandidat 3 (v3.7)", configChanges: "Cache saldo aktif", prodSpec: { ...serviceModel(ca)!.defaultSpec, ramGb: 6 }, dev: { testedTps: 35, p95Ms: 610, cpuPct: 63, memPct: 62 } }), decision: "kembali_dev", notes: "Headroom memori tipis karena cache saldo; RAM Production perlu dinaikkan.", followUps: ["Konfirmasi alokasi RAM Production ke tim infrastruktur"] },
+    { service: ca, release: "Rilis Mutasi", rc: "Kandidat 4 (v3.7)", cycleNo: 4, daysAgo: 54, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "Kandidat 4 (v3.7)", dev: { testedTps: 35, p95Ms: 520, cpuPct: 58, memPct: 60 } }), decision: "kembali_dev", notes: "Menunggu hasil UAT modul transfer.", followUps: ["Selesaikan UAT modul transfer"] },
+    { service: ca, release: "Rilis Mutasi", rc: "Final (v3.7)", cycleNo: 5, daysAgo: 40, p: params(ca, { normalTps: 6, peakTps: 38, serviceVersion: "Final (v3.7)", prodSpec: { ...serviceModel(ca)!.defaultSpec, threadPool: 200 }, dev: { testedTps: 35, p95Ms: 470, cpuPct: 52, memPct: 58 } }), decision: "promosi", notes: "Semua indikator dalam kriteria. Disepakati lanjut ke Production.", followUps: ["Pantau p95 transfer 7 hari pertama"] },
 
-    // R3.8 Payment Gateway API: cycle 4 menunggu sign-off
-    { service: pg, release: "R3.8", rc: "3.8.0-rc1", cycleNo: 1, daysAgo: 42, p: params(pg, { normalTps: 9, peakTps: 52, serviceVersion: "3.8.0-rc1", configChanges: "Integrasi QRIS baru ke https://qris.partner.co.id/api", dev: { testedTps: 40, p95Ms: 1200, cpuPct: 88, memPct: 70, payloadKb: 9 } }), decision: "kembali_dev", notes: "Signature verification memakan CPU berlebih.", followUps: ["Cache public key partner", "Profiling ulang endpoint /pay"] },
-    { service: pg, release: "R3.8", rc: "3.8.0-rc2", cycleNo: 2, daysAgo: 28, p: params(pg, { normalTps: 9, peakTps: 52, serviceVersion: "3.8.0-rc2", configChanges: "Cache public key partner", dev: { testedTps: 40, p95Ms: 760, cpuPct: 74, memPct: 64, payloadKb: 9 } }), decision: "kembali_dev", notes: "Verdict lolos, tetapi promosi ditunda sampai perbaikan connection pool selesai diuji di UAT.", followUps: ["Naikkan connection pool ke 80"] },
-    { service: pg, release: "R3.8", rc: "3.8.0-rc3", cycleNo: 3, daysAgo: 14, p: params(pg, { normalTps: 9, peakTps: 52, whatIf: [2], serviceVersion: "3.8.0-rc3", configChanges: "Connection pool 80", prodSpec: { ...serviceModel(pg)!.defaultSpec, connPool: 80 }, dev: { testedTps: 40, p95Ms: 520, cpuPct: 60, memPct: 60, payloadKb: 9 } }), decision: "kembali_dev", notes: "What-if 2× masih berbasis estimasi; tambah node untuk periode promo akhir tahun.", followUps: ["Tambah 1 node untuk periode promo"] },
-    { service: pg, release: "R3.8", rc: "3.8.0", cycleNo: 4, daysAgo: 1, p: params(pg, { normalTps: 9, peakTps: 52, whatIf: [2], serviceVersion: "3.8.0", configChanges: "Connection pool 80; 4 node", prodSpec: { ...serviceModel(pg)!.defaultSpec, connPool: 80, nodes: 4 }, dev: { testedTps: 40, p95Ms: 500, cpuPct: 58, memPct: 59, payloadKb: 9 } }), decision: "promosi", notes: "Verdict disepakati. Lanjut promosi ke Production pada jadwal deployment Senin.", followUps: ["Siapkan runbook rollback", "Pantau CPU saat promo 11.11"] },
+    // Rilis QRIS (Layanan Pembayaran): cycle 4 menunggu sign-off
+    { service: pg, release: "Rilis QRIS", rc: "Kandidat 1 (v3.8)", cycleNo: 1, daysAgo: 42, p: params(pg, { normalTps: 9, peakTps: 52, serviceVersion: "Kandidat 1 (v3.8)", configChanges: "Integrasi QRIS baru ke https://qris.partner.co.id/api", dev: { testedTps: 40, p95Ms: 1200, cpuPct: 88, memPct: 70, payloadKb: 9 } }), decision: "kembali_dev", notes: "Signature verification memakan CPU berlebih.", followUps: ["Cache public key partner", "Profiling ulang endpoint /pay"] },
+    { service: pg, release: "Rilis QRIS", rc: "Kandidat 2 (v3.8)", cycleNo: 2, daysAgo: 28, p: params(pg, { normalTps: 9, peakTps: 52, serviceVersion: "Kandidat 2 (v3.8)", configChanges: "Cache public key partner", dev: { testedTps: 40, p95Ms: 760, cpuPct: 74, memPct: 64, payloadKb: 9 } }), decision: "kembali_dev", notes: "Verdict lolos, tetapi promosi ditunda sampai perbaikan connection pool selesai diuji di UAT.", followUps: ["Naikkan connection pool ke 80"] },
+    { service: pg, release: "Rilis QRIS", rc: "Kandidat 3 (v3.8)", cycleNo: 3, daysAgo: 14, p: params(pg, { normalTps: 9, peakTps: 52, whatIf: [2], serviceVersion: "Kandidat 3 (v3.8)", configChanges: "Connection pool 80", prodSpec: { ...serviceModel(pg)!.defaultSpec, connPool: 80 }, dev: { testedTps: 40, p95Ms: 520, cpuPct: 60, memPct: 60, payloadKb: 9 } }), decision: "kembali_dev", notes: "What-if 2× masih berbasis estimasi; tambah node untuk periode promo akhir tahun.", followUps: ["Tambah 1 node untuk periode promo"] },
+    { service: pg, release: "Rilis QRIS", rc: "Final (v3.8)", cycleNo: 4, daysAgo: 1, p: params(pg, { normalTps: 9, peakTps: 52, whatIf: [2], serviceVersion: "Final (v3.8)", configChanges: "Connection pool 80; 4 node", prodSpec: { ...serviceModel(pg)!.defaultSpec, connPool: 80, nodes: 4 }, dev: { testedTps: 40, p95Ms: 500, cpuPct: 58, memPct: 59, payloadKb: 9 } }), decision: "promosi", notes: "Verdict disepakati. Lanjut promosi ke Production pada jadwal deployment Senin.", followUps: ["Siapkan runbook rollback", "Pantau CPU saat promo 11.11"] },
 
-    // R2.4 Notification Service: cycle 2 menunggu parameter dari QA
-    { service: ns, release: "R2.4", rc: "2.4.0-rc1", cycleNo: 1, daysAgo: 12, p: params(ns, { normalTps: 10, peakTps: 55, serviceVersion: "2.4.0-rc1", configChanges: "Template push notification baru", dev: { testedTps: 45, p95Ms: 380, cpuPct: 70, memPct: 64, payloadKb: 4 } }), decision: "kembali_dev", notes: "Error rate naik saat burst; retry ke provider SMS perlu backoff.", followUps: ["Tambahkan exponential backoff"] },
-    { service: ns, release: "R2.4", rc: "2.4.0-rc2", cycleNo: 2, daysAgo: -1, status: "menunggu_parameter" },
+    // Rilis Notifikasi: cycle 2 menunggu parameter dari QA
+    { service: ns, release: "Rilis Notifikasi", rc: "Kandidat 1 (v2.4)", cycleNo: 1, daysAgo: 12, p: params(ns, { normalTps: 10, peakTps: 55, serviceVersion: "Kandidat 1 (v2.4)", configChanges: "Template push notification baru", dev: { testedTps: 45, p95Ms: 380, cpuPct: 70, memPct: 64, payloadKb: 4 } }), decision: "kembali_dev", notes: "Error rate naik saat burst; retry ke provider SMS perlu backoff.", followUps: ["Tambahkan exponential backoff"] },
+    { service: ns, release: "Rilis Notifikasi", rc: "Kandidat 2 (v2.4)", cycleNo: 2, daysAgo: -1, status: "menunggu_parameter" },
 
-    // R1.0 Fraud Scoring Service: parameter sudah diisi, siap dianalisis (belum ada model twin)
-    { service: fs, release: "R1.0", rc: "1.0.0-rc1", cycleNo: 1, daysAgo: 0, status: "siap_dianalisis", p: params(fs, { normalTps: 5, peakTps: 33, serviceVersion: "1.0.0-rc1", configChanges: "Model scoring v1 di scoring-01.internal", dev: { testedTps: 30, p95Ms: 450, cpuPct: 66, memPct: 61 } }) },
+    // Rilis Deteksi Fraud: parameter sudah diisi, siap dianalisis (belum ada model twin)
+    { service: fs, release: "Rilis Deteksi Fraud", rc: "Kandidat 1 (v1.0)", cycleNo: 1, daysAgo: 0, status: "siap_dianalisis", p: params(fs, { normalTps: 5, peakTps: 33, serviceVersion: "Kandidat 1 (v1.0)", configChanges: "Model scoring v1 di scoring-01.internal", dev: { testedTps: 30, p95Ms: 450, cpuPct: 66, memPct: 61 } }) },
   ];
 
   const sessions: AlignmentSession[] = [];
   let n = 1;
   for (const pl of plans) {
     const when = at(pl.daysAgo);
-    const id = `aln-${pl.service.split(" ")[0].toLowerCase()}-${pl.release.toLowerCase()}-c${pl.cycleNo}`;
+    const slug = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const id = `aln-${slug(pl.release)}-c${pl.cycleNo}`;
     const s: AlignmentSession = {
       id,
       code: `ALN-${String(n++).padStart(3, "0")}`,
@@ -107,7 +110,7 @@ export async function seed(insert: Insert) {
   const signoffs: SignoffDoc[] = [];
   let so = 1;
   for (const s of sessions.filter((x) => x.decision === "promosi")) {
-    const approved = s.release === "R3.7";
+    const approved = s.release === "Rilis Mutasi";
     const created = new Date(new Date(s.decidedAt!).getTime() + 10 * 60000);
     const d: SignoffDoc = {
       id: `so-${s.id}`,
@@ -160,9 +163,9 @@ export async function seed(insert: Insert) {
     data: {
       type: "traffic_spike",
       title: "Lonjakan trafik saat payday",
-      description: "Timeout pada endpoint /pay pukul 12.05–12.40 setelah rollout 3.7.2. Alert dari monitor api-gw-02.internal.",
+      description: "Timeout pada endpoint /pay pukul 12.05–12.40 setelah pembaruan Agustus. Alert dari monitor api-gw-02.internal.",
       service: pg,
-      release: "R3.7",
+      release: "Rilis Pembayaran Agustus",
       peakRps: 96,
       avgRps: 7,
       durationMin: 35,
@@ -190,7 +193,7 @@ export async function seed(insert: Insert) {
       title: "Latensi naik saat rekonsiliasi malam",
       description: "p95 naik sesaat ketika batch rekonsiliasi berjalan bersamaan dengan trafik malam.",
       service: ca,
-      release: "R3.7",
+      release: "Rilis Mutasi",
       peakRps: 14,
       avgRps: 4,
       durationMin: 20,
@@ -215,10 +218,10 @@ export async function seed(insert: Insert) {
     repro: null,
     data: {
       type: "memory_leak",
-      title: "Memori naik terus setelah rollout 2.3.5",
-      description: "Pod notification di cluster prod-jkt restart OOM tiap ±10 jam sejak rollout.",
+      title: "Memori naik terus setelah pembaruan Oktober",
+      description: "Pod notification di cluster prod-jkt restart OOM tiap ±10 jam sejak pembaruan Oktober.",
       service: ns,
-      release: "R2.3",
+      release: "Rilis Notifikasi Oktober",
       peakRps: 40,
       avgRps: 8,
       durationMin: 600,
@@ -265,10 +268,10 @@ export async function seed(insert: Insert) {
   }
 
   const audits: AuditEntry[] = [
-    { id: "aud-1", createdAt: at(30, 14).toISOString(), user: "Tim Support dan Monitoring", role: "SUP", action: "Unduh laporan (CSV)", target: "Riwayat R3.7" },
+    { id: "aud-1", createdAt: at(30, 14).toISOString(), user: "Tim Support dan Monitoring", role: "SUP", action: "Unduh laporan (CSV)", target: "Riwayat Rilis Mutasi" },
     { id: "aud-2", createdAt: at(39, 9).toISOString(), user: "Project/Technical Manager", role: "PM", action: "Menyetujui sign-off", target: "SO-001" },
   ];
   for (const a of audits) await insert("sa_audit", a.id, a, a.createdAt);
 
-  await insert("sa_settings", "app", { id: "app", createdAt: "2026-01-01T00:00:00.000Z", ...settings, piiScrubbed: true }, "2026-01-01T00:00:00.000Z");
+  await insert("sa_settings", "app", { id: "app", createdAt: "2026-01-01T00:00:00.000Z", ...settings, seedVersion: SEED_VERSION }, "2026-01-01T00:00:00.000Z");
 }

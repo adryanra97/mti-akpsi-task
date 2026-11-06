@@ -8,10 +8,10 @@ export const metadata: Metadata = { title: "Masuk" };
 
 // Halaman ini publik, jadi papan memakai contoh ilustratif, bukan data asli.
 const SAMPLE: BoardRow[] = [
-  { key: "a", date: "Sen", time: "09.00", release: "R4.1", service: "Layanan pembayaran", cycle: 3, gate: "Dev → Production", status: "Lolos", tone: "pass" },
-  { key: "b", date: "Sen", time: "13.30", release: "R2.6", service: "Layanan notifikasi", cycle: 5, gate: "Dev → Production", status: "Bersyarat", tone: "cond" },
-  { key: "c", date: "Sel", time: "10.00", release: "R3.2", service: "Layanan akun", cycle: 2, gate: "Dev → Production", status: "Tidak lolos", tone: "fail" },
-  { key: "d", date: "Sel", time: "15.00", release: "R1.1", service: "Layanan skoring", cycle: 1, gate: "Dev → Production", status: "Menunggu", tone: "wait" },
+  { key: "a", date: "Sen", time: "09.00", release: "Rilis QRIS", service: "Layanan Pembayaran", cycle: 3, gate: "Dev → Production", status: "Lolos", tone: "pass" },
+  { key: "b", date: "Sen", time: "13.30", release: "Rilis Notifikasi", service: "Layanan Notifikasi", cycle: 5, gate: "Dev → Production", status: "Bersyarat", tone: "cond" },
+  { key: "c", date: "Sel", time: "10.00", release: "Rilis Mutasi", service: "Layanan Rekening", cycle: 2, gate: "Dev → Production", status: "Tidak lolos", tone: "fail" },
+  { key: "d", date: "Sel", time: "15.00", release: "Rilis Deteksi Fraud", service: "Layanan Deteksi Fraud", cycle: 1, gate: "Dev → Production", status: "Menunggu", tone: "wait" },
 ];
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {

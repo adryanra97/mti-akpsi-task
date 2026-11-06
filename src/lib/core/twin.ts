@@ -10,28 +10,28 @@ export interface ServiceModel {
 
 export const SERVICES: ServiceModel[] = [
   {
-    name: "Payment Gateway API",
+    name: "Layanan Pembayaran",
     twin: true,
     calibratedAt: "2026-10-12",
     baseline: { avgTps: 6.4, peakTps: 41, cpuPct: 24, memPct: 52, p95Ms: 210, errorRatePct: 0.08 },
     defaultSpec: { vcpu: 8, ramGb: 16, nodes: 3, threadPool: 200, connPool: 60, bandwidthMbps: 1000 },
   },
   {
-    name: "Core Account Service",
+    name: "Layanan Rekening",
     twin: true,
     calibratedAt: "2026-09-28",
     baseline: { avgTps: 4.8, peakTps: 34, cpuPct: 31, memPct: 61, p95Ms: 260, errorRatePct: 0.05 },
     defaultSpec: { vcpu: 8, ramGb: 32, nodes: 2, threadPool: 150, connPool: 50, bandwidthMbps: 1000 },
   },
   {
-    name: "Notification Service",
+    name: "Layanan Notifikasi",
     twin: true,
     calibratedAt: "2026-10-20",
     baseline: { avgTps: 8.2, peakTps: 52, cpuPct: 18, memPct: 44, p95Ms: 140, errorRatePct: 0.12 },
     defaultSpec: { vcpu: 4, ramGb: 8, nodes: 3, threadPool: 120, connPool: 30, bandwidthMbps: 500 },
   },
   {
-    name: "Fraud Scoring Service",
+    name: "Layanan Deteksi Fraud",
     twin: false,
     calibratedAt: null,
     baseline: { avgTps: 3.1, peakTps: 22, cpuPct: 35, memPct: 58, p95Ms: 320, errorRatePct: 0.1 },

@@ -6,6 +6,7 @@ import { listSessions, sortSessions } from "@/lib/data";
 import { can } from "@/lib/roles";
 import { ButtonLink, EmptyState, PageHeader, Tag } from "@/components/ui";
 import { VerdictBadge } from "@/components/verdict";
+import { Glossary } from "@/components/glossary";
 import { fmtDate } from "@/lib/format";
 import { SESSION_STATUS_LABEL } from "@/lib/domain";
 import type { AlignmentSession } from "@/lib/types";
@@ -45,6 +46,10 @@ export default async function AlignmentList() {
         <EmptyState title="Belum ada sesi alignment">Technical Lead dapat menjadwalkan sesi pertama untuk sprint cycle berjalan.</EmptyState>
       )}
 
+      <div className="mb-6">
+        <Glossary />
+      </div>
+
       <div className="grid gap-6">
         {[...groups.entries()].map(([k, list]) => {
           const [release, service] = k.split("|");
@@ -52,7 +57,7 @@ export default async function AlignmentList() {
             <section key={k} aria-labelledby={`g-${k}`} className="rounded-xl border border-line bg-surface">
               <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-5 py-3.5">
                 <h2 id={`g-${k}`} className="text-[17px] font-semibold">
-                  Rilis {release} <span className="font-normal text-ink-3">{service}</span>
+                  {release} <span className="font-normal text-ink-3">{service}</span>
                 </h2>
                 <span className="text-[13px] text-ink-3">{list.length} sprint cycle</span>
               </header>

@@ -37,6 +37,9 @@ const SHAPE: Record<BoardTone, string> = {
  * Papan promosi: setiap release candidate ditampilkan seperti jadwal keberangkatan menuju Production.
  * Tetap berupa tabel agar terbaca pembaca layar; status selalu disertai label teks.
  */
+/** Kolom sudah berjudul "Rilis", jadi awalan "Rilis" tidak diulang di sel papan. */
+const short = (release: string) => release.replace(/^rilis\s+/i, "");
+
 export function DepartureBoard({ rows, caption, animate = true }: { rows: BoardRow[]; caption: string; animate?: boolean }) {
   return (
     <div className="overflow-x-auto rounded-[10px] bg-board text-board-ink ring-1 ring-board-line">
@@ -80,13 +83,13 @@ export function DepartureBoard({ rows, caption, animate = true }: { rows: BoardR
                       aria-label={`${r.release} cycle ${r.cycle}, ${r.service}: ${r.status}`}
                     >
                       <span className="flap" style={d}>
-                        {r.release}
+                        {short(r.release)}
                         <span className="sm:hidden"> C{r.cycle}</span>
                       </span>
                     </Link>
                   ) : (
                     <span className="flap" style={d}>
-                      {r.release}
+                      {short(r.release)}
                       <span className="sm:hidden"> C{r.cycle}</span>
                     </span>
                   )}

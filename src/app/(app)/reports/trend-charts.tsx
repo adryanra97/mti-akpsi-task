@@ -98,7 +98,7 @@ export function IncidentBars({ data }: { data: { release: string; count: number 
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: -24 }} barCategoryGap="30%">
           <CartesianGrid stroke="var(--line)" vertical={false} />
-          <XAxis dataKey="release" tick={{ fontSize: 12, fill: "var(--ink-3)" }} tickLine={false} axisLine={{ stroke: "var(--line-strong)" }} />
+          <XAxis dataKey="release" tickFormatter={(r: string) => r.replace(/^Rilis\s+/i, "")} interval={0} tick={{ fontSize: 12, fill: "var(--ink-3)" }} tickLine={false} axisLine={{ stroke: "var(--line-strong)" }} />
           <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "var(--ink-3)" }} tickLine={false} axisLine={false} />
           <Tooltip content={<Tip unit=" insiden" prefix="Rilis " />} cursor={{ fill: "var(--sunken)" }} />
           <Bar dataKey="count" name="Insiden" fill="var(--series-1)" radius={[4, 4, 0, 0]} maxBarSize={44} isAnimationActive={false}>
