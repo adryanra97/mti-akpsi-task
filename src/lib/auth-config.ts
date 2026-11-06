@@ -10,13 +10,13 @@ export function authConfigProblems(): string[] {
   const out: string[] = [];
   if (!authSecretReady()) out.push("AUTH_SECRET (minimal 32 karakter)");
   const pw = process.env.DEMO_PASSWORD;
-  if (isProd && (!pw || pw.length < 12)) out.push("DEMO_PASSWORD (minimal 12 karakter)");
+  if (isProd && (!pw || pw.length < 8)) out.push("DEMO_PASSWORD (minimal 8 karakter)");
   return out;
 }
 
 function expectedPassword() {
   const pw = process.env.DEMO_PASSWORD;
-  if (pw && pw.length >= 12) return pw;
+  if (pw && pw.length >= 8) return pw;
   return isProd ? null : DEV_PASSWORD;
 }
 

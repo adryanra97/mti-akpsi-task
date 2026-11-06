@@ -92,7 +92,7 @@ Setiap perpindahan status tercatat di riwayat (siapa, kapan, catatan) dan bisa d
 2. **Database**: tab **Storage**, lalu **Create Database**, pilih **Neon (Serverless Postgres)**, lalu sambungkan ke project. `DATABASE_URL` terisi otomatis. Tabel dan data contoh dibuat otomatis saat aplikasi pertama kali dibuka.
 3. **Environment variables** (Settings, lalu Environment Variables):
    - `AUTH_SECRET` (wajib): minimal 32 karakter acak, misalnya hasil `openssl rand -base64 48`. Nilai yang sama dipakai Dashboard dan Core Module untuk menandatangani permintaan dan hasil.
-   - `DEMO_PASSWORD` (wajib): kata sandi akun pengujian, minimal 12 karakter.
+   - `DEMO_PASSWORD` (wajib): kata sandi akun pengujian (satu kata sandi untuk semua peran), minimal 8 karakter.
    - Tanpa keduanya, halaman login menampilkan pesan bahwa konfigurasi belum lengkap dan login ditolak.
    - `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`: opsional, untuk mode LLM.
 4. Redeploy setelah mengubah environment variable.
