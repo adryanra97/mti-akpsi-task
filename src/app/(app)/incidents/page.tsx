@@ -8,16 +8,17 @@ import { ButtonLink, EmptyState, PageHeader, Tag } from "@/components/ui";
 import { VerdictBadge } from "@/components/verdict";
 import { fmtDate } from "@/lib/format";
 import { INCIDENT_TYPE_LABEL, mttrMinutes } from "@/lib/domain";
+import { INCIDENT_STATUS_LABEL } from "@/lib/verdict";
 import type { Incident } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Respons insiden" };
 
-function statusOf(i: Incident): { label: string; tone: "warn" | "accent" | "pass" | "neutral" | "fail" } {
-  if (i.status === "selesai") return i.notReproduced ? { label: "Belum tereproduksi", tone: "neutral" } : i.needsEscalation ? { label: "Perlu eskalasi", tone: "fail" } : { label: "Laporan tersimpan", tone: "pass" };
-  if (i.needsEscalation) return { label: "Perlu eskalasi", tone: "fail" };
-  if (i.status === "mitigasi") return { label: "Menguji mitigasi", tone: "accent" };
-  if (i.status === "dinilai") return { label: "Sudah dinilai", tone: "accent" };
-  return { label: "Baru", tone: "warn" };
+function statusTone(i: Incident): "warn" | "accent" | "pass" | "neutral" | "fail" {
+  if (i.status === "PerluEskalasi" || i.needsEscalation) return "fail";
+  if (i.status === "Terdokumentasi") return "pass";
+  if (i.status === "BelumTereproduksi") return "neutral";
+  if (i.status === "Dicatat") return "warn";
+  return "accent";
 }
 
 export default async function Incidents() {
@@ -53,7 +54,6 @@ export default async function Incidents() {
             </thead>
             <tbody>
               {list.map((i) => {
-                const st = statusOf(i);
                 const mttr = mttrMinutes(i);
                 return (
                   <tr key={i.id} className="border-b border-line last:border-0 hover:bg-surface-2">
@@ -65,10 +65,13 @@ export default async function Incidents() {
                     </td>
                     <td className="px-3 py-3 text-ink-2">{i.data.service}</td>
                     <td className="px-3 py-3 text-ink-2">{fmtDate(i.data.detectedAt, true)}</td>
-                    <td className="px-3 py-3">{i.repro ? <VerdictBadge verdict={i.repro.verdict} size="sm" /> : <span className="text-ink-3">Belum dinilai</span>}</td>
+                    <td className="px-3 py-3">{i.repro ? <VerdictBadge verdict={i.repro.verdict.status} size="sm" /> : <span className="text-ink-3">Belum dinilai</span>}</td>
                     <td className="px-3 py-3 text-ink-2">{mttr ? `${mttr} menit` : "–"}</td>
                     <td className="px-5 py-3">
-                      <Tag tone={st.tone}>{st.label}</Tag>
+                      <Tag tone={statusTone(i)}>
+                        {INCIDENT_STATUS_LABEL[i.status]}
+                        {i.status === "Terdokumentasi" && i.needsEscalation ? ", perlu eskalasi" : ""}
+                      </Tag>
                     </td>
                   </tr>
                 );

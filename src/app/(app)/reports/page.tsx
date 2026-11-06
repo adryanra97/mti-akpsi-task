@@ -10,7 +10,8 @@ import { VerdictBadge, VerdictIcon, VERDICT_TONE } from "@/components/verdict";
 import { VERDICT_LABEL } from "@/lib/verdict";
 import { fmtDate, fmtNum } from "@/lib/format";
 import { CpuTrend, IncidentBars, type CpuSeries } from "./trend-charts";
-import type { AlignmentSession } from "@/lib/types";
+import type { AlignmentSession, Verdict } from "@/lib/types";
+import { latestResult, peakSummary } from "@/lib/domain";
 
 export const metadata: Metadata = { title: "Report" };
 
@@ -34,7 +35,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
     (!filter.release || s.release === filter.release) &&
     (!filter.from || (s.decidedAt ?? s.scheduledAt).slice(0, 10) >= filter.from) &&
     (!filter.to || (s.decidedAt ?? s.scheduledAt).slice(0, 10) <= filter.to);
-  const decided = sessions.filter((s) => s.status === "diputuskan" && s.runs.length && scoped(s));
+  const decided = sessions.filter((s) => (s.status === "Diputuskan" || s.status === "Ditutup") && s.runs.length && scoped(s));
   const byRelease = new Map<string, AlignmentSession[]>();
   for (const s of decided.sort((a, b) => a.cycleNo - b.cycleNo)) byRelease.set(s.release, [...(byRelease.get(s.release) ?? []), s]);
   const releaseOrder = [...byRelease.entries()].sort((a, b) => (b[1].at(-1)!.decidedAt ?? "").localeCompare(a[1].at(-1)!.decidedAt ?? ""));
@@ -42,7 +43,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const cpuSeries: CpuSeries[] = releaseOrder.map(([release, list]) => ({
     release,
     service: list[0].service,
-    points: list.map((s) => ({ cycle: s.cycleNo, cpu: s.runs.at(-1)!.scenarios.find((x) => x.key === "puncak")?.indicators?.cpuPct ?? null })),
+    points: list.map((s) => ({ cycle: s.cycleNo, cpu: peakSummary(latestResult(s))?.cpuPct ?? null })),
   }));
   const incScoped = incidents.filter((i) => (!filter.service || i.data.service === filter.service) && (!filter.release || i.data.release === filter.release));
   const incData = [...new Set(incScoped.map((i) => i.data.release))].sort().map((r) => ({ release: r, count: incScoped.filter((i) => i.data.release === r).length }));
@@ -133,17 +134,17 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                       </th>
                       {Array.from({ length: maxCycle }, (_, i) => {
                         const s = list.find((x) => x.cycleNo === i + 1);
-                        const v = s?.runs.at(-1)?.verdict;
+                        const v = s ? latestResult(s)?.verdict.status : undefined;
                         return (
                           <td key={i} className="px-1 py-1">
                             {v ? (
                               <span
                                 className={cx("flex h-9 items-center justify-center gap-1 rounded-md", VERDICT_TONE[v].bg, VERDICT_TONE[v].text)}
-                                title={`${release} cycle ${i + 1}: ${VERDICT_LABEL[v]}${s?.decision === "promosi" ? ", lanjut promosi" : ""}`}
+                                title={`${release} cycle ${i + 1}: ${VERDICT_LABEL[v]}${s?.decision === "LanjutPromosi" ? ", lanjut promosi" : ""}`}
                               >
                                 <VerdictIcon verdict={v} className="h-4 w-4" />
                                 <span className="sr-only">{VERDICT_LABEL[v]}</span>
-                                {s?.decision === "promosi" && <span className="text-[11.5px] font-semibold">Promosi</span>}
+                                {s?.decision === "LanjutPromosi" && <span className="text-[11.5px] font-semibold">Promosi</span>}
                               </span>
                             ) : (
                               <span className="flex h-9 items-center justify-center rounded-md border border-dashed border-line text-ink-3" aria-label="Tidak ada data">
@@ -158,7 +159,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
                 </tbody>
               </table>
               <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-2" aria-label="Keterangan verdict">
-                {(["LOLOS", "LOLOS_BERSYARAT", "TIDAK_LOLOS", "TIDAK_DAPAT_DINILAI"] as const).map((v) => (
+                {(["Lolos", "LolosBersyarat", "TidakLolos", "TidakDapatDinilai"] as Verdict[]).map((v) => (
                   <li key={v} className="flex items-center gap-1.5">
                     <VerdictIcon verdict={v} className={cx("h-3.5 w-3.5", VERDICT_TONE[v].text)} />
                     {VERDICT_LABEL[v]}

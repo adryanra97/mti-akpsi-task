@@ -1,50 +1,42 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CircleCheck, ShieldAlert } from "lucide-react";
+import { CircleCheck, Info, ShieldAlert } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
 import { getIncident } from "@/lib/data";
-import { INCIDENT_TYPE_LABEL, mttrMinutes } from "@/lib/domain";
+import { INCIDENT_TYPE_LABEL, mttrMinutes, peakSummary, selectedMitigation } from "@/lib/domain";
 import { KeyValue, Notice, PageHeader, Panel, Tag, cx } from "@/components/ui";
-import { IndicatorTable, TraceList, VerdictBadge, VerdictHero } from "@/components/verdict";
+import { IndicatorTable, VerdictBadge, VerdictHero } from "@/components/verdict";
+import { ResultDetails } from "@/components/result-details";
+import { StatusHistory } from "@/components/status-history";
 import { Stepper } from "@/components/stepper";
 import { AllTestedButton, CopySummary, FinalizeForm, MitigationLab, ReproRunner } from "./incident-tools";
-import { fmtDate, fmtIdr, fmtNum } from "@/lib/format";
-import { RESOURCE_LABEL } from "@/lib/core/twin";
-import { applyChanges, INCIDENT_CRITERIA } from "@/lib/core/engine";
-import { VERDICT_LABEL } from "@/lib/verdict";
-import type { Assessment, Incident, ScenarioResult } from "@/lib/types";
+import { fmtDate, fmtNum } from "@/lib/format";
+import { INCIDENT_STATUS_LABEL, LIMITING_LABEL, VERDICT_LABEL } from "@/lib/verdict";
+import type { AnalysisStep, Incident, IncidentStatus, Spec } from "@/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const i = await getIncident((await params).id);
   return { title: i ? i.code : "Insiden" };
 }
 
-function asScenario(a: Assessment, label: string, tps: number): ScenarioResult {
-  return {
-    key: a.id,
-    label,
-    kind: "puncak",
-    tps,
-    route: a.indicators ? (a.manualVerification.length ? "estimasi_penalaran" : "digital_twin") : "dihentikan",
-    indicators: a.indicators,
-    limiting: a.limiting,
-    status: a.verdict,
-    violations: [],
-  };
+const STATES: IncidentStatus[] = ["Dicatat", "DalamReproduksi", "Tereproduksi", "BelumTereproduksi", "UjiMitigasi", "MitigasiDitemukan", "PerluEskalasi", "Terdokumentasi"];
+
+function applied(spec: Spec, ch: Partial<Spec>): Spec {
+  return { ...spec, ...Object.fromEntries(Object.entries(ch).filter(([, v]) => v)) };
 }
 
 function summaryText(inc: Incident) {
-  const chosen = inc.mitigations.find((m) => m.id === inc.selectedMitigationId);
+  const chosen = selectedMitigation(inc);
   const lines = [
     `Laporan insiden ${inc.code}: ${inc.data.title}`,
     `Layanan ${inc.data.service}, rilis ${inc.data.release}, tipe ${INCIDENT_TYPE_LABEL[inc.data.type]}.`,
     `Terdeteksi ${fmtDate(inc.data.detectedAt, true)} WIB, beban puncak ${inc.data.peakRps} RPS selama ${inc.data.durationMin} menit.`,
-    `Status reproduksi: ${inc.notReproduced ? "belum tereproduksi" : "tereproduksi pada spesifikasi saat ini"}.`,
-    inc.repro?.limiting ? `Sumber daya pembatas: ${RESOURCE_LABEL[inc.repro.limiting]}.` : "",
-    ...(inc.repro?.rootCauses.length ? ["Kemungkinan akar masalah:", ...inc.repro.rootCauses.map((c) => `- ${c}`)] : []),
-    `Verdict sebelum mitigasi: ${inc.repro ? VERDICT_LABEL[inc.repro.verdict] : "-"}.`,
-    chosen ? `Mitigasi terpilih: ${chosen.label} (verdict ${chosen.result ? VERDICT_LABEL[chosen.result.verdict] : "-"}).` : "",
+    `Status reproduksi: ${inc.repro?.statusReproduksi === "Tereproduksi" ? "tereproduksi pada spesifikasi saat ini" : "belum tereproduksi"}.`,
+    inc.repro?.sumberDayaPembatas ? `Sumber daya pembatas: ${LIMITING_LABEL[inc.repro.sumberDayaPembatas]}.` : "",
+    ...(inc.repro?.kemungkinanAkarMasalah.length ? ["Kemungkinan akar masalah:", ...inc.repro.kemungkinanAkarMasalah.map((c) => `- ${c}`)] : []),
+    `Verdict sebelum mitigasi: ${inc.repro ? VERDICT_LABEL[inc.repro.verdict.status] : "-"}.`,
+    chosen ? `Mitigasi terpilih: ${chosen.label} (verdict ${VERDICT_LABEL[chosen.result.verdict.status]}).` : "",
     inc.needsEscalation ? "Perlu eskalasi ke Technical Lead: tidak ada opsi mitigasi yang lolos." : "",
     mttrMinutes(inc) ? `Waktu deteksi sampai akar masalah teridentifikasi: ${mttrMinutes(inc)} menit.` : "",
   ];
@@ -58,11 +50,13 @@ export default async function IncidentPage({ params, searchParams }: { params: P
   const inc = await getIncident(id);
   if (!inc) notFound();
   const d = inc.data;
-  const manage = can(user.role, "incident.manage") && inc.status !== "selesai";
-  const closed = inc.status === "selesai";
-  const hasPass = inc.mitigations.some((m) => m.result?.verdict === "LOLOS");
+  const manage = can(user.role, "incident.manage");
+  const st = inc.status;
+  const documented = st === "Terdokumentasi";
+  const notReproduced = st === "BelumTereproduksi" || inc.history.some((h) => h.status === "BelumTereproduksi");
+  const hasPass = inc.mitigations.some((m) => m.result.verdict.status === "Lolos");
 
-  const current = closed ? 4 : !inc.repro ? 1 : inc.notReproduced ? 3 : inc.mitigations.length ? (hasPass || inc.needsEscalation ? 3 : 2) : 2;
+  const current = { Dicatat: 0, DalamReproduksi: 1, Tereproduksi: 2, UjiMitigasi: 2, BelumTereproduksi: 3, MitigasiDitemukan: 3, PerluEskalasi: 3, Terdokumentasi: 4 }[st];
   const steps = [
     { label: "Data insiden", detail: "Integration Engineer" },
     { label: "Reproduksi", detail: "Core Module" },
@@ -70,17 +64,30 @@ export default async function IncidentPage({ params, searchParams }: { params: P
     { label: "Laporan insiden", detail: "Riwayat laporan" },
   ];
 
+  // Kolom pembanding: spesifikasi saat ini dan setiap opsi mitigasi, pada beban insiden yang sama.
+  const columns: AnalysisStep[] = [];
+  if (inc.repro?.langkah[0]) columns.push({ ...inc.repro.langkah[0], kunci: "awal", deskripsi: "Spesifikasi saat ini" });
+  inc.mitigations.forEach((m, i) => columns.push({ ...m.result.langkah[0], kunci: `opsi-${i}`, deskripsi: `Opsi ${i + 1}` }));
+
   return (
     <>
       <PageHeader
         back={{ href: "/incidents", label: "Respons insiden" }}
         title={`${inc.code}: ${d.title}`}
         description={`${d.service}, rilis ${d.release}. Terdeteksi ${fmtDate(d.detectedAt, true)} WIB.`}
-        actions={<Tag tone="fail">{INCIDENT_TYPE_LABEL[d.type]}</Tag>}
+        actions={
+          <>
+            <Tag tone="fail">{INCIDENT_TYPE_LABEL[d.type]}</Tag>
+            <Tag tone={documented ? "pass" : st === "PerluEskalasi" ? "fail" : "accent"}>{INCIDENT_STATUS_LABEL[st]}</Tag>
+          </>
+        }
       />
       <Stepper steps={steps} current={current} />
+      <div className="mt-5">
+        <StatusHistory title="Status kasus insiden" history={inc.history} labels={INCIDENT_STATUS_LABEL} states={STATES} />
+      </div>
 
-      {laporan && closed && (
+      {laporan && documented && (
         <div className="mt-6">
           <Notice tone="pass" icon={<CircleCheck className="h-4 w-4 text-pass" />} title="Laporan insiden tersimpan ke riwayat laporan">
             Tim Support dan Monitoring dapat mengunduhnya dari halaman Report.
@@ -96,7 +103,7 @@ export default async function IncidentPage({ params, searchParams }: { params: P
       )}
 
       <div className="mt-6 grid gap-6">
-        <Panel title="Data insiden" description={`Dibuka oleh ${inc.createdBy}`}>
+        <Panel title="Data insiden" description={`Dicatat oleh ${inc.createdBy}`}>
           <div className="grid gap-5 md:grid-cols-2">
             <KeyValue
               items={[
@@ -110,7 +117,7 @@ export default async function IncidentPage({ params, searchParams }: { params: P
             <KeyValue
               items={[
                 ["Spesifikasi", `${d.spec.vcpu} vCPU, ${d.spec.ramGb} GB RAM, ${d.spec.nodes} node`],
-                ["Pool", `Thread ${d.spec.threadPool}, connection ${d.spec.connPool}`],
+                ["Pool", `Thread ${d.spec.threadPool}, connection ${d.spec.connPool}, timeout ${d.spec.timeoutMs ?? 3000} ms`],
                 ["Data ELK", d.elkDataAvailable ? "Tersedia" : "Tidak tersedia, memakai gejala manual"],
                 ...(d.manualSymptoms ? ([["Gejala manual", d.manualSymptoms]] as [string, string][]) : []),
               ]}
@@ -118,111 +125,80 @@ export default async function IncidentPage({ params, searchParams }: { params: P
           </div>
         </Panel>
 
-        <Panel title="Reproduksi insiden" description="Apakah insiden akan terjadi lagi pada spesifikasi saat ini?">
+        <Panel title="Reproduksi insiden" description="Apakah insiden akan terjadi lagi pada spesifikasi saat ini? Simulasi berjalan di digital twin, bukan Production.">
           {!inc.repro ? (
-            manage ? (
-              <ReproRunner id={inc.id} />
+            manage && (st === "Dicatat" || st === "DalamReproduksi") ? (
+              <ReproRunner id={inc.id} retry={st === "DalamReproduksi"} />
             ) : (
               <p className="text-[14px] text-ink-3">Belum dinilai oleh Integration Engineer.</p>
             )
           ) : (
             <div className="grid gap-5">
-              <div
-                className={cx(
-                  "rounded-lg border px-4 py-3",
-                  inc.repro.reproduced ? "border-fail/40 bg-fail-soft" : "border-na/40 bg-na-soft",
-                )}
-              >
-                <p className={cx("font-display text-[22px] font-semibold", inc.repro.reproduced ? "text-fail" : "text-na")}>
-                  {inc.repro.reproduced ? "Insiden akan terjadi lagi pada spesifikasi saat ini" : "Insiden belum tereproduksi"}
+              <div className={cx("rounded-lg border px-4 py-3", inc.repro.statusReproduksi === "Tereproduksi" ? "border-fail/40 bg-fail-soft" : "border-na/40 bg-na-soft")}>
+                <p className={cx("text-[22px] font-semibold", inc.repro.statusReproduksi === "Tereproduksi" ? "text-fail" : "text-na")}>
+                  {inc.repro.statusReproduksi === "Tereproduksi" ? "Insiden akan terjadi lagi pada spesifikasi saat ini" : "Insiden belum tereproduksi"}
                 </p>
                 <p className="mt-0.5 text-[14px] text-ink-2">
-                  {inc.repro.reproduced
-                    ? `Sumber daya pembatas: ${RESOURCE_LABEL[inc.repro.limiting!]}. Lanjutkan dengan menguji opsi mitigasi.`
-                    : "Rekomendasi: kalibrasi ulang model digital twin dengan data periode insiden. Laporan tetap dapat disimpan dengan penanda khusus."}
+                  {inc.repro.statusReproduksi === "Tereproduksi"
+                    ? "Lanjutkan dengan menguji opsi mitigasi."
+                    : "Rekomendasi: kalibrasi ulang model digital twin dengan data periode insiden. Laporan tetap dapat disusun."}
                 </p>
               </div>
-              <VerdictHero
-                verdict={inc.repro.verdict}
-                reasons={inc.repro.reasons}
-                conditions={[]}
-                narrative={inc.repro.narrative}
-                meta={<p>{fmtDate(inc.repro.createdAt, true)}</p>}
-              />
-              {inc.repro.rootCauses.length > 0 && (
+              <VerdictHero result={inc.repro} title="Verdict pada spesifikasi saat ini" />
+              {inc.repro.kemungkinanAkarMasalah.length > 0 && (
                 <div>
                   <h3 className="text-[14px] font-semibold">Kemungkinan akar masalah</h3>
                   <ul className="mt-1.5 list-disc pl-5 text-[14px] text-ink-2">
-                    {inc.repro.rootCauses.map((c, i) => (
+                    {inc.repro.kemungkinanAkarMasalah.map((c, i) => (
                       <li key={i}>{c}</li>
                     ))}
                   </ul>
                 </div>
               )}
-              {inc.repro.indicators && (
-                <IndicatorTable
-                  useLabels
-                  scenarios={[
-                    asScenario(inc.repro, "Spesifikasi saat ini", d.peakRps),
-                    ...inc.mitigations.filter((m) => m.result).map((m, i) => asScenario(m.result!, `Opsi ${i + 1}`, d.peakRps)),
-                  ]}
-                  criteria={INCIDENT_CRITERIA}
-                />
-              )}
-              {inc.repro.warnings.length > 0 && (
-                <Notice tone="warn" title="Catatan dari Core Module">
-                  <ul className="list-disc pl-4">
-                    {inc.repro.warnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                </Notice>
-              )}
-              <p className="text-[13px] text-ink-3">
-                Kriteria SLA Production: p95 ≤ {INCIDENT_CRITERIA.maxP95Ms} ms, error ≤ {INCIDENT_CRITERIA.maxErrorRatePct}%, CPU ≤ {INCIDENT_CRITERIA.maxCpuPct}%, memori ≤ {INCIDENT_CRITERIA.maxMemPct}%.{" "}
-                {inc.repro.mode === "demo" ? "Mode demo, biaya LLM Rp0." : `Estimasi biaya LLM ${fmtIdr(inc.repro.cost.idr)}.`}
-              </p>
               <details className="rounded-lg border border-line">
-                <summary className="cursor-pointer px-4 py-2.5 text-[14px] font-medium">Jejak keputusan agen</summary>
-                <div className="border-t border-line px-4 py-2">
-                  <TraceList trace={inc.repro.trace} />
+                <summary className="cursor-pointer px-4 py-2.5 text-[14px] font-medium">Rincian hasil reproduksi</summary>
+                <div className="border-t border-line p-4">
+                  <ResultDetails r={inc.repro} showRunway={false} />
                 </div>
               </details>
-              {manage && <ReproRunner id={inc.id} rerun />}
             </div>
           )}
         </Panel>
 
-        {inc.repro && !inc.notReproduced && (
-          <Panel title="Opsi mitigasi" description="Uji opsi satu per satu sampai ada yang memperoleh verdict Lolos, atau semua opsi selesai diuji.">
+        {inc.repro && !notReproduced && (
+          <Panel title="Opsi mitigasi" description="Uji opsi satu per satu sampai ada yang memperoleh verdict Lolos, atau tutup pengujian bila semua opsi sudah diuji.">
             {inc.mitigations.length > 0 && (
-              <ol className="mb-5 grid gap-2">
-                {inc.mitigations.map((m, i) => {
-                  const sp = applyChanges(d.spec, m.changes);
-                  return (
-                    <li key={m.id} className={cx("rounded-lg border px-4 py-3", m.id === inc.selectedMitigationId ? "border-accent" : "border-line")}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[13px] text-ink-3">Opsi {i + 1}</span>
-                        <span className="font-medium">{m.label}</span>
-                        {m.result && <VerdictBadge verdict={m.result.verdict} size="sm" />}
-                        {m.id === inc.selectedMitigationId && <Tag tone="accent">Direkomendasikan</Tag>}
-                      </div>
-                      <p className="mt-1 text-[13.5px] text-ink-2">
-                        {sp.vcpu} vCPU, {sp.ramGb} GB, {sp.nodes} node, thread pool {sp.threadPool}, connection pool {sp.connPool}
-                        {m.changes.timeoutMs ? `, timeout ${m.changes.timeoutMs} ms` : ""}.{" "}
-                        {m.result?.indicators &&
-                          `${RESOURCE_LABEL[m.result.limiting!]} ${fmtNum(Math.max(m.result.indicators.cpuPct, m.result.indicators.memPct, m.result.indicators.threadSatPct, m.result.indicators.connSatPct))}%, p95 ${m.result.indicators.p95Ms} ms.`}
-                      </p>
-                      {m.result && <p className="mt-1 text-[13.5px] text-ink-3">{m.result.narrative}</p>}
-                    </li>
-                  );
-                })}
-              </ol>
+              <>
+                <ol className="mb-5 grid gap-2">
+                  {inc.mitigations.map((m, i) => {
+                    const sp = applied(d.spec, m.changes);
+                    const pk = peakSummary(m.result);
+                    return (
+                      <li key={m.id} className={cx("rounded-lg border px-4 py-3", m.id === inc.selectedMitigationId ? "border-accent" : "border-line")}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[13px] text-ink-3">Opsi {i + 1}</span>
+                          <span className="font-medium">{m.label}</span>
+                          <VerdictBadge verdict={m.result.verdict.status} size="sm" />
+                          {m.id === inc.selectedMitigationId && <Tag tone="accent">Terpilih</Tag>}
+                        </div>
+                        <p className="mt-1 text-[13.5px] text-ink-2">
+                          {sp.vcpu} vCPU, {sp.ramGb} GB, {sp.nodes} node, thread pool {sp.threadPool}, connection pool {sp.connPool}, timeout {sp.timeoutMs ?? 3000} ms.{" "}
+                          {pk && `p95 ${fmtNum(pk.p95Ms, 0)} ms, error ${fmtNum(pk.errorRatePct, 2)}%.`}
+                        </p>
+                        <p className="mt-1 text-[13.5px] text-ink-3">{m.result.verdict.narasi}</p>
+                      </li>
+                    );
+                  })}
+                </ol>
+                <div className="mb-5">
+                  <IndicatorTable steps={columns} criteria={inc.repro.kriteria} useLabels />
+                </div>
+              </>
             )}
-            {manage && !hasPass && (
+            {manage && (st === "Tereproduksi" || st === "UjiMitigasi") && (
               <div className="grid gap-4">
                 <MitigationLab id={inc.id} spec={d.spec} count={inc.mitigations.length} />
-                {inc.mitigations.length > 0 && !inc.needsEscalation && (
+                {st === "UjiMitigasi" && inc.mitigations.length > 0 && !hasPass && (
                   <div className="border-t border-line pt-4">
                     <p className="mb-2 text-[14px] text-ink-2">Tidak ada opsi lain yang ingin diuji?</p>
                     <AllTestedButton id={inc.id} />
@@ -230,27 +206,33 @@ export default async function IncidentPage({ params, searchParams }: { params: P
                 )}
               </div>
             )}
-            {manage && hasPass && <Notice tone="pass" title="Ada opsi mitigasi yang memperoleh verdict Lolos">Pilih mitigasi yang direkomendasikan di bawah, lalu simpan laporan.</Notice>}
+            {st === "MitigasiDitemukan" && (
+              <Notice tone="pass" title="Mitigasi ditemukan">
+                Ada opsi yang memperoleh verdict Lolos. Pilih mitigasi yang direkomendasikan, lalu susun laporan.
+              </Notice>
+            )}
           </Panel>
         )}
 
-        {manage && inc.repro && (inc.notReproduced || inc.mitigations.length > 0) && (
+        {manage && (st === "MitigasiDitemukan" || st === "PerluEskalasi" || st === "BelumTereproduksi") && (
           <Panel title="Laporan insiden" description="Memuat data insiden, status reproduksi, verdict sebelum dan sesudah mitigasi, serta waktu deteksi dan akar masalah sebagai data MTTR.">
-            <FinalizeForm id={inc.id} mitigations={inc.mitigations} notReproduced={inc.notReproduced} />
+            <FinalizeForm id={inc.id} mitigations={inc.mitigations} notReproduced={st === "BelumTereproduksi"} />
           </Panel>
         )}
+        {!manage && !documented && (
+          <Notice tone="info" icon={<Info className="h-4 w-4 text-accent" />} title="Ditangani Integration Engineer">
+            Halaman ini menampilkan perkembangan kasus. Penilaian dan laporan disusun oleh Integration Engineer.
+          </Notice>
+        )}
 
-        {closed && (
+        {documented && (
           <Panel title="Laporan insiden" description={`Disimpan ${fmtDate(inc.closedAt, true)}`} actions={<CopySummary text={summaryText(inc)} />}>
             <KeyValue
               items={[
-                ["Status", inc.notReproduced ? "Belum tereproduksi (perlu kalibrasi ulang model)" : inc.needsEscalation ? "Perlu eskalasi ke Technical Lead" : "Mitigasi terpilih"],
-                ["Verdict sebelum", inc.repro ? <VerdictBadge key="v" verdict={inc.repro.verdict} size="sm" /> : "–"],
-                [
-                  "Verdict sesudah",
-                  inc.selectedMitigationId ? <VerdictBadge key="a" verdict={inc.mitigations.find((m) => m.id === inc.selectedMitigationId)?.result?.verdict ?? null} size="sm" /> : "–",
-                ],
-                ["Mitigasi terpilih", inc.mitigations.find((m) => m.id === inc.selectedMitigationId)?.label ?? "–"],
+                ["Jalur akhir", notReproduced ? "Belum tereproduksi (perlu kalibrasi ulang model)" : inc.needsEscalation ? "Perlu eskalasi ke Technical Lead" : "Mitigasi ditemukan"],
+                ["Verdict sebelum", inc.repro ? <VerdictBadge key="v" verdict={inc.repro.verdict.status} size="sm" /> : "–"],
+                ["Verdict sesudah", selectedMitigation(inc) ? <VerdictBadge key="a" verdict={selectedMitigation(inc)!.result.verdict.status} size="sm" /> : "–"],
+                ["Mitigasi terpilih", selectedMitigation(inc)?.label ?? "–"],
                 ["Waktu deteksi", `${fmtDate(d.detectedAt, true)} WIB`],
                 ["Akar masalah teridentifikasi", inc.rootCauseAt ? `${fmtDate(inc.rootCauseAt, true)} WIB` : "–"],
                 ["MTTR (deteksi ke akar masalah)", mttrMinutes(inc) ? `${mttrMinutes(inc)} menit` : "–"],

@@ -7,7 +7,7 @@ import { EmptyState, Notice, Panel, Tag } from "@/components/ui";
 import { DepartureBoard, type BoardRow, type BoardTone } from "@/components/board";
 import { Glossary } from "@/components/glossary";
 import { fmtRelative } from "@/lib/format";
-import { INCIDENT_TYPE_LABEL } from "@/lib/domain";
+import { INCIDENT_TYPE_LABEL, latestResult } from "@/lib/domain";
 import type { AlignmentSession, SignoffDoc, Verdict } from "@/lib/types";
 
 const SECTION_NAME: Record<string, string> = {
@@ -19,20 +19,21 @@ const SECTION_NAME: Record<string, string> = {
 };
 
 const VERDICT_BOARD: Record<Verdict, [string, BoardTone]> = {
-  LOLOS: ["Lolos", "pass"],
-  LOLOS_BERSYARAT: ["Bersyarat", "cond"],
-  TIDAK_LOLOS: ["Tidak lolos", "fail"],
-  TIDAK_DAPAT_DINILAI: ["Tidak dapat dinilai", "na"],
+  Lolos: ["Lolos", "pass"],
+  LolosBersyarat: ["Bersyarat", "cond"],
+  TidakLolos: ["Tidak lolos", "fail"],
+  TidakDapatDinilai: ["Tidak dapat dinilai", "na"],
 };
 
 function boardStatus(s: AlignmentSession, signoffs: SignoffDoc[]): [string, BoardTone] {
-  if (s.status === "menunggu_parameter") return ["Menunggu parameter", "wait"];
-  if (s.status === "siap_dianalisis") return ["Siap dianalisis", "wait"];
-  if (s.status === "dianalisis") return VERDICT_BOARD[s.runs.at(-1)!.verdict];
-  if (s.decision === "kembali_dev") return ["Kembali ke Dev", "na"];
+  if (s.status === "Terjadwal") return ["Terjadwal", "wait"];
+  if (s.status === "PengisianParameter") return [s.params ? "Siap diajukan" : "Pengisian parameter", "wait"];
+  if (s.status === "MenungguHasil") return ["Menunggu hasil", "wait"];
+  if (s.status === "Peninjauan") return VERDICT_BOARD[latestResult(s)!.verdict.status];
+  if (s.decision === "KembaliKeDev") return ["Kembali ke Dev", "na"];
   const so = signoffs.find((d) => d.id === s.signoffId);
-  if (so?.status === "menunggu") return ["Menunggu sign-off", "wait"];
-  if (so?.status === "ditolak") return ["Sign-off ditolak", "fail"];
+  if (so?.status === "MenungguKeputusan" || so?.status === "Draf") return ["Menunggu sign-off", "wait"];
+  if (so?.status === "Ditolak") return ["Sign-off ditolak", "fail"];
   return ["Disetujui", "pass"];
 }
 
@@ -44,8 +45,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
   const [todos, sessions, incidents, signoffs] = await Promise.all([todosFor(user.role), listSessions(), listIncidents(), listSignoffs()]);
   const canOpen = SECTION_ACCESS.alignment.includes(user.role);
 
-  const upcoming = sessions.filter((s) => s.status !== "diputuskan").sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
-  const recent = sessions.filter((s) => s.status === "diputuskan").sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""));
+  const upcoming = sessions.filter((s) => s.status !== "Diputuskan" && s.status !== "Ditutup").sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+  const recent = sessions.filter((s) => s.status === "Diputuskan" || s.status === "Ditutup").sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""));
   const rows: BoardRow[] = [...upcoming, ...recent].slice(0, 6).map((s) => {
     const [status, tone] = boardStatus(s, signoffs);
     return {
@@ -62,7 +63,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
     };
   });
 
-  const openIncidents = incidents.filter((i) => i.status !== "selesai");
+  const openIncidents = incidents.filter((i) => i.status !== "Terdokumentasi");
   const icon = { alignment: CalendarClock, signoff: FileSignature, incident: Siren };
   const today = wib(new Date().toISOString(), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const headline = todos.length ? `${todos.length} hal menunggu Anda` : "Tidak ada yang menunggu Anda";

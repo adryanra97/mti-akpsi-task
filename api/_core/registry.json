@@ -1,0 +1,61 @@
+{
+  "layanan": [
+    {
+      "nama": "Layanan Pembayaran",
+      "model": {
+        "versiModel": "dt-pembayaran-1.4",
+        "statusAktif": true,
+        "tanggalKalibrasi": "2026-10-12",
+        "tpsMinTerkalibrasi": 1,
+        "tpsMaksTerkalibrasi": 120,
+        "cakupanKomponen": ["CPU", "memori", "jaringan", "thread pool", "connection pool", "database", "dependensi eksternal", "payload"]
+      },
+      "baseline": { "avgTps": 6.4, "peakTps": 41, "cpuPct": 24, "memPct": 52, "p95Ms": 210, "errorRatePct": 0.08 },
+      "spesifikasi": { "vcpu": 8, "ramGb": 16, "nodes": 3, "threadPool": 200, "connPool": 60, "bandwidthMbps": 1000, "timeoutMs": 3000 },
+      "porsiDatabase": 0.6
+    },
+    {
+      "nama": "Layanan Rekening",
+      "model": {
+        "versiModel": "dt-rekening-2.1",
+        "statusAktif": true,
+        "tanggalKalibrasi": "2026-09-28",
+        "tpsMinTerkalibrasi": 1,
+        "tpsMaksTerkalibrasi": 100,
+        "cakupanKomponen": ["CPU", "memori", "jaringan", "thread pool", "connection pool", "database", "payload"]
+      },
+      "baseline": { "avgTps": 4.8, "peakTps": 34, "cpuPct": 31, "memPct": 61, "p95Ms": 260, "errorRatePct": 0.05 },
+      "spesifikasi": { "vcpu": 8, "ramGb": 32, "nodes": 2, "threadPool": 150, "connPool": 50, "bandwidthMbps": 1000, "timeoutMs": 3000 },
+      "porsiDatabase": 0.75
+    },
+    {
+      "nama": "Layanan Notifikasi",
+      "model": {
+        "versiModel": "dt-notifikasi-1.2",
+        "statusAktif": true,
+        "tanggalKalibrasi": "2026-10-20",
+        "tpsMinTerkalibrasi": 1,
+        "tpsMaksTerkalibrasi": 150,
+        "cakupanKomponen": ["CPU", "memori", "jaringan", "thread pool", "connection pool", "dependensi eksternal", "payload"]
+      },
+      "baseline": { "avgTps": 8.2, "peakTps": 52, "cpuPct": 18, "memPct": 44, "p95Ms": 140, "errorRatePct": 0.12 },
+      "spesifikasi": { "vcpu": 4, "ramGb": 8, "nodes": 3, "threadPool": 120, "connPool": 30, "bandwidthMbps": 500, "timeoutMs": 2000 },
+      "porsiDatabase": 0.3
+    },
+    {
+      "nama": "Layanan Deteksi Fraud",
+      "model": {
+        "versiModel": "dt-fraud-0.1",
+        "statusAktif": false,
+        "tanggalKalibrasi": null,
+        "tpsMinTerkalibrasi": 0,
+        "tpsMaksTerkalibrasi": 0,
+        "cakupanKomponen": []
+      },
+      "baseline": { "avgTps": 3.1, "peakTps": 22, "cpuPct": 35, "memPct": 58, "p95Ms": 320, "errorRatePct": 0.1 },
+      "spesifikasi": { "vcpu": 8, "ramGb": 16, "nodes": 2, "threadPool": 100, "connPool": 40, "bandwidthMbps": 1000, "timeoutMs": 3000 },
+      "porsiDatabase": 0.5
+    }
+  ],
+  "komponenDiLuarCakupan": ["kafka", "rabbitmq", "message broker", "antrean pesan", "redis", "cache terdistribusi", "elasticsearch", "grpc", "websocket"]
+}

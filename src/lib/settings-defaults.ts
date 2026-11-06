@@ -27,8 +27,8 @@ export const PROVIDER_LABEL: Record<ProviderId, string> = {
 };
 
 export const MODEL_SUGGESTIONS: Record<ProviderId, string[]> = {
-  anthropic: ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"],
-  openai: ["gpt-5-mini", "gpt-5", "gpt-5-nano"],
-  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"],
+  anthropic: ["claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5-5", "claude-haiku-5-5"],
+  openai: ["gpt-5-mini", "gpt-5", "gpt-5.6-sol"],
+  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.1-pro"],
 };
 

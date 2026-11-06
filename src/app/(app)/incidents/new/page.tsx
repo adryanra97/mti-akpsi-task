@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
 import { PageHeader } from "@/components/ui";
-import { SERVICES } from "@/lib/core/twin";
+import { SERVICES } from "@/lib/services";
 import { IncidentForm } from "./incident-form";
 
 export const metadata: Metadata = { title: "Buka kasus insiden" };
@@ -19,7 +19,7 @@ export default async function NewIncident() {
         description="Catat data insiden dan spesifikasi sistem saat ini. Setelah disimpan, Core Module menilai apakah insiden akan terulang."
         back={{ href: "/incidents", label: "Respons insiden" }}
       />
-      <IncidentForm services={SERVICES.map((s) => ({ name: s.name, spec: s.defaultSpec }))} nowWib={now} />
+      <IncidentForm services={SERVICES.map((s) => ({ name: s.nama, spec: s.spesifikasi }))} nowWib={now} />
     </>
   );
 }

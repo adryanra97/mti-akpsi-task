@@ -13,6 +13,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@electric-sql/pglite"],
+  // Core Module (Python/FastAPI) berjalan sebagai Vercel Function di api/index.py.
+  // Saat pengembangan lokal, arahkan ke uvicorn melalui CORE_MODULE_DEV_URL.
+  async rewrites() {
+    const dev = process.env.CORE_MODULE_DEV_URL;
+    return [{ source: "/api/py/:path*", destination: dev ? `${dev}/api/py/:path*` : "/api/" }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

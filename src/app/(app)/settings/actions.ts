@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
 import { getSettings, providerKeyConfigured, saveSettings, PROVIDER_LABEL } from "@/lib/settings";
-import { callLlm } from "@/lib/core/llm";
+import { signCoreToken } from "@/lib/core-request";
 import { resetAll } from "@/lib/db";
 import type { ProviderId } from "@/lib/types";
 
@@ -58,17 +58,13 @@ export async function updateSettings(_: SettingsState, f: FormData): Promise<Set
   return { ok: mode === "llm" ? `Tersimpan. Analisis berikutnya memakai ${PROVIDER_LABEL[provider]} (${model}).` : "Tersimpan. Analisis berikutnya memakai mode demo." };
 }
 
-export async function testConnection(provider: ProviderId, model: string): Promise<{ ok: boolean; message: string }> {
+/** Menerbitkan token singkat; uji koneksi dijalankan oleh Core Module (Python, LangChain) di /api/py/uji-koneksi. */
+export async function testConnectionToken(provider: ProviderId, model: string): Promise<{ ok: boolean; message?: string; token?: string }> {
   await requirePermission("settings.manage");
   if (!PROVIDERS.includes(provider)) return { ok: false, message: "Penyedia tidak dikenal." };
   if (!providerKeyConfigured(provider)) return { ok: false, message: `${ENV_NAME[provider]} belum diisi di environment variable.` };
-  const t0 = Date.now();
-  try {
-    const r = await callLlm(provider, model, "Jawab sangat singkat.", 'Balas persis dengan kata: "siap"', 20);
-    return { ok: true, message: `Tersambung dalam ${((Date.now() - t0) / 1000).toFixed(1)} detik. Jawaban model: "${r.text.trim().slice(0, 40)}"` };
-  } catch (e) {
-    return { ok: false, message: (e as Error).message };
-  }
+  if (!/^[\w.:\-/]{1,80}$/.test(model)) return { ok: false, message: "Nama model tidak valid." };
+  return { ok: true, token: await signCoreToken("uji-koneksi", { provider, model }, "1m") };
 }
 
 export async function resetDemoData(): Promise<{ ok: boolean; message: string }> {

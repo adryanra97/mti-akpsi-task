@@ -9,14 +9,14 @@ import type { Verdict } from "@/lib/types";
 
 export function DecisionForm({ sessionId, verdict, defaultFollowUps }: { sessionId: string; verdict: Verdict; defaultFollowUps: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(decideCycle.bind(null, sessionId), {});
-  const blocked = verdict === "TIDAK_LOLOS" || verdict === "TIDAK_DAPAT_DINILAI";
-  const [decision, setDecision] = useState<string>(state.values?.decision ?? (blocked ? "kembali_dev" : ""));
+  const blocked = verdict === "TidakLolos" || verdict === "TidakDapatDinilai";
+  const [decision, setDecision] = useState<string>(state.values?.decision ?? (blocked ? "KembaliKeDev" : ""));
   const [confirming, setConfirming] = useState(false);
   const e = state.errors ?? {};
 
   const options = [
     {
-      value: "promosi",
+      value: "LanjutPromosi",
       title: "Lanjut promosi ke Production",
       body: blocked
         ? "Tidak tersedia: verdict Tidak Lolos atau Tidak Dapat Dinilai mengharuskan release candidate kembali ke Dev."
@@ -24,7 +24,7 @@ export function DecisionForm({ sessionId, verdict, defaultFollowUps }: { session
       disabled: blocked,
     },
     {
-      value: "kembali_dev",
+      value: "KembaliKeDev",
       title: "Kembali ke Dev untuk sprint cycle berikutnya",
       body: "Laporan disimpan. Catatan tindak lanjut menjadi masukan cycle berikutnya.",
       disabled: false,
@@ -74,7 +74,7 @@ export function DecisionForm({ sessionId, verdict, defaultFollowUps }: { session
         label="Catatan tindak lanjut (satu per baris)"
         htmlFor="followUps"
         error={e.followUps}
-        hint={decision === "kembali_dev" ? "Wajib diisi saat kembali ke Dev." : "Opsional saat promosi."}
+        hint={decision === "KembaliKeDev" ? "Wajib diisi saat kembali ke Dev." : "Opsional saat promosi."}
       >
         <Textarea id="followUps" name="followUps" rows={3} defaultValue={state.values?.followUps ?? defaultFollowUps} aria-invalid={!!e.followUps} />
       </Field>
@@ -94,14 +94,14 @@ export function DecisionForm({ sessionId, verdict, defaultFollowUps }: { session
             <Lock className="h-4 w-4" aria-hidden /> Keputusan tidak dapat diubah setelah disimpan.
           </p>
           <p className="mt-1 text-[14px] text-ink-2">
-            {decision === "promosi"
+            {decision === "LanjutPromosi"
               ? "Laporan alignment akan disimpan dan permintaan sign-off dikirim ke Project/Technical Manager."
               : "Laporan alignment akan disimpan dan release candidate kembali ke environment Dev."}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="submit" disabled={pending}>
               {pending && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-              {decision === "promosi" ? "Simpan dan kirim permintaan sign-off" : "Simpan keputusan kembali ke Dev"}
+              {decision === "LanjutPromosi" ? "Simpan dan kirim permintaan sign-off" : "Simpan keputusan kembali ke Dev"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setConfirming(false)} disabled={pending}>
               Periksa lagi

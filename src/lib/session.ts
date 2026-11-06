@@ -14,7 +14,7 @@ const isProd = process.env.NODE_ENV === "production";
 const DEV_SECRET = "dev-only-secret-tidak-dipakai-di-production-000000";
 
 /** Mengembalikan kunci penandatangan sesi, atau null bila konfigurasi Production belum lengkap. */
-function secret(): Uint8Array | null {
+export function secret(): Uint8Array | null {
   const s = process.env.AUTH_SECRET;
   if (s && s.length >= 32) return new TextEncoder().encode(s);
   if (isProd) return null;

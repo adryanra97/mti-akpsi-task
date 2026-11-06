@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle, Pencil, Play, RotateCcw } from "lucide-react";
 import { saveParams, type FormState } from "../actions";
 import { Button, Field, Input, KeyValue, Notice, Textarea, cx } from "@/components/ui";
-import { RunProgress, useStreamRun } from "@/components/run-progress";
+import { RunProgress, useCoreRun } from "@/components/run-progress";
 import type { AlignmentParams } from "@/lib/types";
 import { fmtNum } from "@/lib/format";
 
-const WHATIF = [1.5, 2, 3, 5];
+const WHATIF = [2, 3, 5, 10];
 
 type NumField = { name: string; label: string; value: number; hint?: string; unit?: string };
 
@@ -53,6 +53,7 @@ export function Workbench({
   canRun,
   needsRun,
   hasRuns,
+  waiting,
 }: {
   sessionId: string;
   params: AlignmentParams;
@@ -62,11 +63,12 @@ export function Workbench({
   canRun: boolean;
   needsRun: boolean;
   hasRuns: boolean;
+  waiting: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(!hasSavedParams && canEdit);
   const [state, action, pending] = useActionState<FormState, FormData>(saveParams.bind(null, sessionId), {});
-  const run = useStreamRun();
+  const run = useCoreRun();
   const lastSaved = useRef<number | undefined>(undefined);
   const errorRef = useRef<HTMLDivElement>(null);
   const e = state.errors ?? {};
@@ -74,7 +76,7 @@ export function Workbench({
   const sv = (k: string, d: string) => vals?.[k] ?? d;
 
   async function startRun() {
-    const ok = await run.start(`/api/alignment/${sessionId}/run`);
+    const ok = await run.start(`/api/alignment/${sessionId}/request`, `/api/alignment/${sessionId}/result`);
     if (ok) {
       router.refresh();
       setTimeout(() => document.getElementById("hasil")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
@@ -86,7 +88,7 @@ export function Workbench({
       lastSaved.current = state.savedAt;
       setEditing(false);
       router.refresh();
-      if (state.intent === "run") startRun();
+      if (state.intent === "run") setTimeout(startRun, 50);
     }
     if (state.errors) errorRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,7 +105,7 @@ export function Workbench({
               items={[
                 ["Beban normal", `${fmtNum(p.normalTps)} TPS`],
                 ["Beban puncak", `${fmtNum(p.peakTps)} TPS`],
-                ["Uji what-if", p.whatIf.length ? p.whatIf.map((m) => `${fmtNum(m)}×`).join(", ") : "Tidak ada"],
+                ["Uji what-if", p.whatIf.length ? p.whatIf.map((m) => `${fmtNum(m)}× normal (${fmtNum(p.normalTps * m)} TPS)`).join(", ") : "Tidak ada"],
                 ["Versi layanan", p.serviceVersion],
                 ["Perubahan", p.configChanges || "–"],
               ]}
@@ -113,7 +115,7 @@ export function Workbench({
                 ["Kriteria", `p95 ≤ ${p.criteria.maxP95Ms} ms, error ≤ ${p.criteria.maxErrorRatePct}%, CPU ≤ ${p.criteria.maxCpuPct}%, memori ≤ ${p.criteria.maxMemPct}%`],
                 ["Uji Dev", `${p.devSummary.testedTps} TPS, p95 ${p.devSummary.p95Ms} ms, CPU ${p.devSummary.cpuPct}%`],
                 ["Spesifikasi Dev", `${p.devSpec.vcpu} vCPU, ${p.devSpec.ramGb} GB, ${p.devSpec.nodes} node`],
-                ["Spesifikasi Production", `${p.prodSpec.vcpu} vCPU, ${p.prodSpec.ramGb} GB, ${p.prodSpec.nodes} node, thread pool ${p.prodSpec.threadPool}, connection pool ${p.prodSpec.connPool}`],
+                ["Spesifikasi Production", `${p.prodSpec.vcpu} vCPU, ${p.prodSpec.ramGb} GB, ${p.prodSpec.nodes} node, thread pool ${p.prodSpec.threadPool}, connection pool ${p.prodSpec.connPool}, timeout ${p.prodSpec.timeoutMs ?? 3000} ms`],
               ]}
             />
           </div>
@@ -126,21 +128,21 @@ export function Workbench({
             {canRun && hasSavedParams && (
               <Button onClick={startRun} disabled={run.running}>
                 {run.running ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : hasRuns ? <RotateCcw className="h-4 w-4" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}
-                {run.running ? "Menganalisis…" : hasRuns ? "Jalankan ulang analisis" : "Jalankan analisis"}
+                {run.running ? "Menganalisis…" : waiting ? "Ajukan ulang analisis" : "Ajukan analisis"}
               </Button>
             )}
             {canEdit && (
               <Button variant="secondary" onClick={() => setEditing(true)} disabled={run.running}>
-                <Pencil className="h-4 w-4" aria-hidden /> {hasSavedParams ? "Ubah parameter atau uji varian lain" : "Isi parameter"}
+                <Pencil className="h-4 w-4" aria-hidden /> {!hasSavedParams ? "Isi parameter" : hasRuns ? "Uji varian lain" : "Ubah parameter"}
               </Button>
             )}
             {needsRun && hasSavedParams && !run.running && (
-              <span className="text-[13.5px] text-cond">Parameter berubah sejak analisis terakhir. Jalankan analisis agar verdict mengikuti parameter terbaru.</span>
+              <span className="text-[13.5px] text-cond">Parameter berubah sejak analisis terakhir. Ajukan analisis agar verdict mengikuti parameter terbaru.</span>
             )}
           </div>
         )}
         {run.error && <Notice tone="fail" title="Analisis gagal">{run.error}</Notice>}
-        <RunProgress steps={run.steps} running={run.running} />
+        <RunProgress steps={run.steps} statuses={run.statuses} running={run.running} />
       </div>
     );
   }
@@ -173,7 +175,7 @@ export function Workbench({
         </div>
         <div>
           <p className="mb-1.5 text-[13.5px] font-medium" id="whatif-label">
-            Uji what-if (pengali beban puncak)
+            Uji what-if bertingkat (pengali beban normal)
           </p>
           <div className="flex flex-wrap gap-2" role="group" aria-labelledby="whatif-label">
             {WHATIF.map((m) => (
@@ -182,11 +184,13 @@ export function Workbench({
                 className="flex cursor-pointer items-center gap-2 rounded-lg border border-line-strong px-3 py-2 text-[14px] has-[:checked]:border-accent has-[:checked]:bg-accent-soft"
               >
                 <input type="checkbox" name="whatIf" value={m} defaultChecked={vals ? (vals.whatIf ?? "").split(",").includes(String(m)) : p.whatIf.includes(m)} className="accent-[var(--accent)]" />
-                {fmtNum(m)}× puncak
+                {fmtNum(m)}× normal
               </label>
             ))}
           </div>
-          <p className="mt-1 text-[13px] text-ink-3">Varian di atas 2,5× titik uji Dev memakai estimasi penalaran; di atas 5× tidak dapat dinilai.</p>
+          <p className="mt-1 text-[13px] text-ink-3">
+            Setiap varian dijalankan pada digital twin. Bila beban varian berada di luar rentang terkalibrasi model, analisis dihentikan dengan status Tidak Dapat Dinilai.
+          </p>
         </div>
       </Group>
 
@@ -197,7 +201,7 @@ export function Workbench({
         <Field
           label="Perubahan konfigurasi atau versi"
           htmlFor="configChanges"
-          hint="Host, IP, email, dan nomor panjang disamarkan otomatis sebelum dikirim ke Layanan LLM."
+          hint="Host, IP, email, dan nomor panjang disamarkan otomatis. Komponen di luar cakupan model (mis. Kafka, Redis) dinilai lewat estimasi penalaran."
         >
           <Textarea id="configChanges" name="configChanges" rows={2} defaultValue={sv("configChanges", p.configChanges)} />
         </Field>
@@ -244,6 +248,7 @@ export function Workbench({
             <NumberInput f={{ name: "prodThreadPool", label: "Thread pool per node", value: p.prodSpec.threadPool }} values={vals} error={e.prodThreadPool} />
             <NumberInput f={{ name: "prodConnPool", label: "Connection pool per node", value: p.prodSpec.connPool }} values={vals} error={e.prodConnPool} />
             <NumberInput f={{ name: "prodBandwidth", label: "Bandwidth per node", unit: "Mbps", value: p.prodSpec.bandwidthMbps }} values={vals} error={e.prodBandwidth} />
+            <NumberInput f={{ name: "prodTimeoutMs", label: "Timeout request", unit: "ms", value: p.prodSpec.timeoutMs ?? 3000 }} values={vals} error={e.prodTimeoutMs} />
           </div>
         </div>
       </Group>
@@ -252,7 +257,7 @@ export function Workbench({
         {canRun && (
           <Button type="submit" name="intent" value="run" disabled={pending}>
             {pending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}
-            Simpan dan jalankan analisis
+            Simpan dan ajukan analisis
           </Button>
         )}
         <Button type="submit" name="intent" value="save" variant="secondary" disabled={pending}>

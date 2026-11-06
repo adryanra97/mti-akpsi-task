@@ -3,6 +3,8 @@
 import { useCallback, useState } from "react";
 import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle, TriangleAlert } from "lucide-react";
 import { cx } from "./ui";
+import type { RequestStatus } from "@/lib/types";
+import { REQUEST_STATUS_LABEL } from "@/lib/verdict";
 
 export interface StepState {
   id: string;
@@ -11,34 +13,45 @@ export interface StepState {
   note?: string;
 }
 
-export function useStreamRun() {
+const ORDER: RequestStatus[] = ["Diterima", "Disamarkan", "Direncanakan", "Dijalankan", "Dinilai", "Selesai"];
+
+async function jsonOrError(res: Response) {
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error ?? j.detail ?? `Permintaan gagal (HTTP ${res.status}).`);
+  return j;
+}
+
+/**
+ * Menjalankan satu PermintaanAnalisis: Dashboard menerbitkan token, Core Module Python mengalirkan progres,
+ * lalu hasil bertanda tangan dikirim kembali ke Dashboard untuk diverifikasi dan disimpan.
+ */
+export function useCoreRun() {
   const [steps, setSteps] = useState<StepState[]>([]);
+  const [statuses, setStatuses] = useState<RequestStatus[]>([]);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
 
-  const start = useCallback(async (url: string, body?: unknown) => {
+  const start = useCallback(async (requestUrl: string, resultUrl: string, body?: unknown) => {
     setSteps([]);
+    setStatuses([]);
     setError(null);
-    setDone(false);
     setRunning(true);
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      const { token, coreUrl } = await jsonOrError(
+        await fetch(requestUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body ?? {}) }),
+      );
+      const res = await fetch(coreUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error ?? `Permintaan gagal (HTTP ${res.status}).`);
+        throw new Error(j.detail ?? j.error ?? `Core Module tidak dapat dihubungi (HTTP ${res.status}).`);
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
-      let ok = false;
+      let final: { hasil: string; tanda: string } | null = null;
       for (;;) {
-        const { value, done: end } = await reader.read();
-        if (end) break;
+        const { value, done } = await reader.read();
+        if (done) break;
         buf += dec.decode(value, { stream: true });
         let nl: number;
         while ((nl = buf.indexOf("\n")) >= 0) {
@@ -54,12 +67,15 @@ export function useStreamRun() {
               next[i] = ev;
               return next;
             });
-          } else if (ev.type === "error") throw new Error(ev.message);
-          else if (ev.type === "done") ok = true;
+          } else if (ev.type === "status") setStatuses((p) => [...p, ev.status]);
+          else if (ev.type === "error") throw new Error(ev.message);
+          else if (ev.type === "done") final = { hasil: ev.hasil, tanda: ev.tanda };
         }
       }
-      if (!ok) throw new Error("Koneksi terputus sebelum analisis selesai. Jalankan ulang analisis.");
-      setDone(true);
+      if (!final) throw new Error("Koneksi ke Core Module terputus sebelum analisis selesai. Jalankan ulang analisis.");
+      await jsonOrError(
+        await fetch(resultUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(final) }),
+      );
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -69,10 +85,61 @@ export function useStreamRun() {
     }
   }, []);
 
-  return { steps, running, error, done, start };
+  return { steps, statuses, running, error, start };
 }
 
-export function RunProgress({ steps, running }: { steps: StepState[]; running: boolean }) {
+function StatusTrack({ statuses }: { statuses: RequestStatus[] }) {
+  const stopped = statuses.includes("Dihentikan");
+  const order = stopped ? (["Diterima", "Disamarkan", "Direncanakan", "Dijalankan", "Dihentikan", "Dinilai", "Selesai"] as RequestStatus[]) : ORDER;
+  const current = statuses.at(-1);
+  return (
+    <ol className="mb-3 flex flex-wrap gap-1.5" aria-label="Status permintaan analisis">
+      {order.map((s) => {
+        const reached = statuses.includes(s);
+        return (
+          <li
+            key={s}
+            className={cx(
+              "rounded-md px-2 py-0.5 text-[12.5px] font-medium",
+              s === current ? "bg-primary text-primary-ink" : reached ? (s === "Dihentikan" ? "bg-na-soft text-na" : "bg-pass-soft text-pass") : "bg-sunken text-ink-3",
+            )}
+            aria-current={s === current ? "step" : undefined}
+          >
+            {REQUEST_STATUS_LABEL[s]}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function StepList({ steps }: { steps: StepState[] }) {
+  return (
+    <ol className="grid gap-1.5">
+      {steps.map((s) => (
+        <li key={s.id} className="flex gap-2.5 text-[14px]">
+          <span className="mt-0.5 shrink-0">
+            {s.state === "run" ? (
+              <LoaderCircle className="h-4 w-4 animate-spin text-accent" aria-label="Berjalan" />
+            ) : s.state === "done" ? (
+              <CircleCheck className="h-4 w-4 text-pass" aria-label="Selesai" />
+            ) : s.state === "warn" ? (
+              <TriangleAlert className="h-4 w-4 text-cond" aria-label="Selesai dengan catatan" />
+            ) : (
+              <CircleMinus className="h-4 w-4 text-na" aria-label="Dihentikan" />
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className={cx(s.state === "run" && "font-medium")}>{s.label}</span>
+            {s.note && <span className="block text-[13px] text-ink-3">{s.note}</span>}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export function RunProgress({ steps, statuses, running }: { steps: StepState[]; statuses: RequestStatus[]; running: boolean }) {
   if (!steps.length && !running) return null;
   if (!running) {
     const warn = steps.filter((s) => s.state === "warn" || s.state === "skip").length;
@@ -81,10 +148,11 @@ export function RunProgress({ steps, running }: { steps: StepState[]; running: b
         <summary className="cursor-pointer">
           <span className="inline-flex items-center gap-2">
             <CircleCheck className="h-4 w-4 text-pass" aria-hidden />
-            Analisis selesai: {steps.length} langkah{warn ? `, ${warn} dengan catatan` : ""}
+            Permintaan analisis selesai: {steps.length} langkah{warn ? `, ${warn} dengan catatan` : ""}
           </span>
         </summary>
-        <div className="mt-2">
+        <div className="mt-3">
+          <StatusTrack statuses={statuses} />
           <StepList steps={steps} />
         </div>
       </details>
@@ -92,41 +160,14 @@ export function RunProgress({ steps, running }: { steps: StepState[]; running: b
   }
   return (
     <div className="rounded-lg border border-line bg-surface-2 p-4" aria-live="polite">
-      <p className="mb-2 text-[13.5px] font-medium">
-        {running ? "Core Module sedang bekerja…" : "Langkah Core Module"}
-      </p>
+      <p className="mb-2 text-[13.5px] font-medium">Core Module sedang memproses permintaan analisis…</p>
+      <StatusTrack statuses={statuses} />
       <StepList steps={steps} />
       {steps.every((s) => s.state !== "run") && (
         <p className="mt-1.5 flex gap-2.5 text-[14px] text-ink-3">
-          <CircleDashed className="running-dot mt-0.5 h-4 w-4" aria-hidden /> Menyiapkan langkah berikutnya…
+          <CircleDashed className="running-dot mt-0.5 h-4 w-4" aria-hidden /> {steps.length ? "Menyiapkan langkah berikutnya…" : "Menghubungi Core Module…"}
         </p>
       )}
     </div>
-  );
-}
-
-function StepList({ steps }: { steps: StepState[] }) {
-  return (
-      <ol className="grid gap-1.5">
-        {steps.map((s) => (
-          <li key={s.id} className="flex gap-2.5 text-[14px]">
-            <span className="mt-0.5 shrink-0">
-              {s.state === "run" ? (
-                <LoaderCircle className="h-4 w-4 animate-spin text-accent" aria-label="Berjalan" />
-              ) : s.state === "done" ? (
-                <CircleCheck className="h-4 w-4 text-pass" aria-label="Selesai" />
-              ) : s.state === "warn" ? (
-                <TriangleAlert className="h-4 w-4 text-cond" aria-label="Selesai dengan catatan" />
-              ) : (
-                <CircleMinus className="h-4 w-4 text-na" aria-label="Dilewati" />
-              )}
-            </span>
-            <span className="min-w-0">
-              <span className={cx(s.state === "run" ? "font-medium" : "text-ink")}>{s.label}</span>
-              {s.note && <span className="block text-[13px] text-ink-3">{s.note}</span>}
-            </span>
-          </li>
-        ))}
-      </ol>
   );
 }

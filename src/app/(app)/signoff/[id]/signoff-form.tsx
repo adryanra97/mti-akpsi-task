@@ -17,8 +17,8 @@ export function SignoffForm({ id }: { id: string }) {
         <legend className="mb-2 text-[13.5px] font-medium">Keputusan sign-off</legend>
         <div className="grid gap-2">
           {[
-            { v: "disetujui", t: "Setujui", b: "Dokumen dikunci dengan nomor versi dan tanda waktu, siap dilampirkan pada release approval." },
-            { v: "ditolak", t: "Tolak", b: "Dokumen disimpan berstatus ditolak; release candidate kembali ke Dev." },
+            { v: "Disetujui", t: "Setujui", b: "Dokumen dikunci dengan nomor versi dan tanda waktu, siap dilampirkan pada release approval." },
+            { v: "Ditolak", t: "Tolak", b: "Dokumen disimpan berstatus ditolak; release candidate kembali ke Dev." },
           ].map((o) => (
             <label
               key={o.v}
@@ -47,7 +47,7 @@ export function SignoffForm({ id }: { id: string }) {
         </div>
         {e.decision && <p className="mt-1 text-[13px] text-fail">{e.decision}</p>}
       </fieldset>
-      <Field label={decision === "ditolak" ? "Alasan penolakan" : "Catatan"} htmlFor="notes" error={e.notes} hint={decision === "ditolak" ? "Wajib diisi." : "Opsional."}>
+      <Field label={decision === "Ditolak" ? "Alasan penolakan" : "Catatan"} htmlFor="notes" error={e.notes} hint={decision === "Ditolak" ? "Wajib diisi." : "Opsional."}>
         <Textarea id="notes" name="notes" rows={3} defaultValue={state.values?.notes} aria-invalid={!!e.notes} />
       </Field>
       {state.error && <p role="alert" className="text-[14px] text-fail">{state.error}</p>}
@@ -63,9 +63,9 @@ export function SignoffForm({ id }: { id: string }) {
             <Lock className="h-4 w-4" aria-hidden /> Dokumen akan dikunci dan tidak dapat diubah.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="submit" variant={decision === "ditolak" ? "danger" : "primary"} disabled={pending}>
+            <Button type="submit" variant={decision === "Ditolak" ? "danger" : "primary"} disabled={pending}>
               {pending && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
-              {decision === "ditolak" ? "Tolak sign-off" : "Setujui dan kunci dokumen"}
+              {decision === "Ditolak" ? "Tolak sign-off" : "Setujui dan kunci dokumen"}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setConfirming(false)}>
               Periksa lagi

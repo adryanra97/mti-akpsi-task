@@ -1,0 +1,8 @@
+fastapi==0.162.0
+simpy==4.1.2
+PyJWT==2.15.0
+pydantic==2.13.5
+langchain-core==1.7.6
+langchain-anthropic==1.7.10
+langchain-openai==1.7.4
+langchain-google-genai==4.4.3

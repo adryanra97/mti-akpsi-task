@@ -3,9 +3,22 @@
 import { submitWith } from "@/components/form";
 import { useActionState, useState, useTransition } from "react";
 import { CircleCheck, CircleX, KeyRound, LoaderCircle, PlugZap, RotateCcw } from "lucide-react";
-import { resetDemoData, testConnection, updateSettings, type SettingsState } from "./actions";
+import { resetDemoData, testConnectionToken, updateSettings, type SettingsState } from "./actions";
 import { Button, Field, Input, Notice, Panel, cx } from "@/components/ui";
 import type { AppSettings, ProviderId } from "@/lib/types";
+
+async function runConnectionTest(provider: ProviderId, model: string): Promise<{ ok: boolean; message: string }> {
+  const t = await testConnectionToken(provider, model);
+  if (!t.ok || !t.token) return { ok: false, message: t.message ?? "Gagal menyiapkan uji koneksi." };
+  try {
+    const res = await fetch("/api/py/uji-koneksi", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: t.token }) });
+    const j = (await res.json().catch(() => null)) as { ok?: boolean; message?: string; detail?: string } | null;
+    if (!j) return { ok: false, message: `Core Module tidak menjawab (HTTP ${res.status}).` };
+    return { ok: Boolean(j.ok), message: j.message ?? j.detail ?? "Tidak ada jawaban." };
+  } catch {
+    return { ok: false, message: "Core Module tidak dapat dihubungi." };
+  }
+}
 
 export function SettingsForm({
   settings,
@@ -116,7 +129,7 @@ export function SettingsForm({
             type="button"
             variant="secondary"
             disabled={testing || !keys[provider]}
-            onClick={() => startTest(async () => setTest(await testConnection(provider, models[provider])))}
+            onClick={() => startTest(async () => setTest(await runConnectionTest(provider, models[provider])))}
           >
             {testing ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : <PlugZap className="h-4 w-4" aria-hidden />}
             Uji koneksi

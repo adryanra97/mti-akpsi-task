@@ -5,9 +5,9 @@ import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
 import { put } from "@/lib/db";
 import { getSession, listSessions, listSignoffs } from "@/lib/data";
-import { defaultParams, limitationsFor, reportFromSession } from "@/lib/domain";
-import type { AlignmentParams, AlignmentSession, SignoffDoc } from "@/lib/types";
-import { SERVICES } from "@/lib/core/twin";
+import { defaultParams, latestResult, limitationsFor, reportFromSession, transition } from "@/lib/domain";
+import type { AlignmentParams, AlignmentSession, CycleDecision, SignoffDoc } from "@/lib/types";
+import { SERVICES } from "@/lib/services";
 
 export interface FormState {
   ok?: boolean;
@@ -50,7 +50,7 @@ export async function scheduleSession(_: FormState, f: FormData): Promise<FormSt
   const cycleNo = num(f, "cycleNo");
   const date = String(f.get("scheduledAt") ?? "");
   const errors: Record<string, string> = {};
-  if (!SERVICES.some((s) => s.name === service)) errors.service = "Pilih layanan.";
+  if (!SERVICES.some((s) => s.nama === service)) errors.service = "Pilih layanan.";
   if (!release) errors.release = "Isi nama rilis, misalnya Rilis Dompet Digital.";
   if (!rc) errors.releaseCandidate = "Isi versi yang diuji, misalnya Kandidat 1 (v3.9).";
   if (!Number.isInteger(cycleNo) || cycleNo < 1) errors.cycleNo = "Nomor cycle harus bilangan bulat 1 atau lebih.";
@@ -75,10 +75,12 @@ export async function scheduleSession(_: FormState, f: FormData): Promise<FormSt
     envTarget: "Production",
     scheduledAt: new Date(`${date}:00+07:00`).toISOString(),
     createdAt: new Date().toISOString(),
-    status: "menunggu_parameter",
+    status: "Terjadwal",
+    history: [],
     params: null,
     runs: [],
   };
+  transition(s, "Terjadwal", user.name, "Jadwal sesi dibuat");
   // Parameter cycle sebelumnya disimpan sebagai draf agar QA cukup memperbarui yang berubah.
   if (prev?.params) s.draftFrom = prev.id;
   await put("sa_sessions", s);
@@ -86,11 +88,24 @@ export async function scheduleSession(_: FormState, f: FormData): Promise<FormSt
   redirect(`/alignment/${s.id}`);
 }
 
+/** bukaSesi() lebih awal oleh Technical Lead. Sesi juga terbuka otomatis saat jadwal akhir sprint cycle tiba. */
+export async function openSession(sessionId: string) {
+  const user = await requirePermission("alignment.schedule");
+  const s = await getSession(sessionId);
+  if (!s || s.status !== "Terjadwal") return;
+  transition(s, "PengisianParameter", user.name, "Sesi dibuka lebih awal");
+  await put("sa_sessions", s);
+  await audit(user, "Membuka sesi alignment", s.code);
+  revalidatePath("/", "layout");
+}
+
 export async function saveParams(sessionId: string, _: FormState, f: FormData): Promise<FormState> {
   const user = await requirePermission("alignment.params");
   const s = await getSession(sessionId);
   if (!s) return { error: "Sesi tidak ditemukan." };
-  if (s.status === "diputuskan") return { error: "Sesi sudah diputuskan; parameter tidak dapat diubah." };
+  if (s.status === "Terjadwal") return { error: "Sesi belum dibuka. Parameter dapat diisi saat jadwal akhir sprint cycle tiba." };
+  if (s.status === "Diputuskan" || s.status === "Ditutup") return { error: "Sesi sudah diputuskan; parameter tidak dapat diubah." };
+  if (s.status === "MenungguHasil") return { error: "Analisis sedang berjalan. Tunggu hasilnya sebelum mengubah parameter." };
 
   const base = s.params ?? defaultParams(s.service);
   const errors: Record<string, string> = {};
@@ -130,6 +145,7 @@ export async function saveParams(sessionId: string, _: FormState, f: FormData): 
       threadPool: base.devSpec.threadPool,
       connPool: base.devSpec.connPool,
       bandwidthMbps: base.devSpec.bandwidthMbps,
+      timeoutMs: base.devSpec.timeoutMs ?? 3000,
     },
     prodSpec: {
       vcpu: need("prodVcpu", "vCPU Production", 0, true),
@@ -138,6 +154,7 @@ export async function saveParams(sessionId: string, _: FormState, f: FormData): 
       threadPool: need("prodThreadPool", "thread pool", 0, true),
       connPool: need("prodConnPool", "connection pool", 0, true),
       bandwidthMbps: need("prodBandwidth", "bandwidth"),
+      timeoutMs: need("prodTimeoutMs", "timeout", 0, true),
     },
   };
   if (!p.serviceVersion) errors.serviceVersion = "Isi versi layanan yang diuji.";
@@ -150,7 +167,9 @@ export async function saveParams(sessionId: string, _: FormState, f: FormData): 
 
   s.params = p;
   s.paramsBy = user.name;
-  s.status = "siap_dianalisis";
+  s.paramVersion = (s.paramVersion ?? 0) + 1;
+  // masukkanParameter() [perlu uji varian lain]: Peninjauan -> Pengisian Parameter (Gambar 10.16).
+  if (s.status === "Peninjauan") transition(s, "PengisianParameter", user.name, "Uji varian lain");
   await put("sa_sessions", s);
   await audit(user, "Menyimpan parameter analisis", s.code);
   revalidatePath(`/alignment/${s.id}`);
@@ -161,8 +180,8 @@ export async function decideCycle(sessionId: string, _: FormState, f: FormData):
   const user = await requirePermission("alignment.decide");
   const s = await getSession(sessionId);
   if (!s) return { error: "Sesi tidak ditemukan." };
-  const run = s.runs.at(-1);
-  if (!run || s.status !== "dianalisis") return { error: "Jalankan analisis dengan parameter terbaru sebelum mencatat keputusan." };
+  const run = latestResult(s);
+  if (!run || s.status !== "Peninjauan") return { error: "Keputusan dicatat saat sesi berada pada tahap Peninjauan." };
   const decision = String(f.get("decision") ?? "");
   const notes = String(f.get("notes") ?? "").trim();
   const followUps = String(f.get("followUps") ?? "")
@@ -170,24 +189,26 @@ export async function decideCycle(sessionId: string, _: FormState, f: FormData):
     .map((x) => x.trim())
     .filter(Boolean);
   const errors: Record<string, string> = {};
-  if (decision !== "promosi" && decision !== "kembali_dev") errors.decision = "Pilih keputusan cycle.";
-  if (decision === "promosi" && (run.verdict === "TIDAK_LOLOS" || run.verdict === "TIDAK_DAPAT_DINILAI")) {
+  if (decision !== "LanjutPromosi" && decision !== "KembaliKeDev") errors.decision = "Pilih keputusan cycle.";
+  if (decision === "LanjutPromosi" && (run.verdict.status === "TidakLolos" || run.verdict.status === "TidakDapatDinilai")) {
     errors.decision = "Verdict ini tidak mengizinkan promosi ke Production. Pilih kembali ke Dev.";
   }
   if (!notes) errors.notes = "Tulis ringkasan keputusan dari alignment meeting.";
-  if (decision === "kembali_dev" && followUps.length === 0) errors.followUps = "Tulis minimal satu tindak lanjut untuk sprint cycle berikutnya.";
+  if (decision === "KembaliKeDev" && followUps.length === 0) errors.followUps = "Tulis minimal satu tindak lanjut untuk sprint cycle berikutnya.";
   if (Object.keys(errors).length) return { errors, values: echo(f) };
 
-  s.decision = decision as AlignmentSession["decision"];
+  // catatKeputusan(keputusan, catatan): Peninjauan -> Diputuskan; simpanLaporan(): Diputuskan -> Ditutup.
+  s.decision = decision as CycleDecision;
   s.decisionNotes = notes;
   s.followUps = followUps;
   s.decidedBy = user.name;
   s.decidedAt = new Date().toISOString();
-  s.status = "diputuskan";
+  transition(s, "Diputuskan", user.name, decision === "LanjutPromosi" ? "Lanjut promosi" : "Kembali ke Dev");
   s.reportId = `rpt-${s.id}`;
   await put("sa_reports", reportFromSession(s));
+  transition(s, "Ditutup", user.name, decision === "LanjutPromosi" ? "Laporan disimpan; ajukanSignOff()" : "Laporan disimpan");
 
-  if (decision === "promosi") {
+  if (decision === "LanjutPromosi") {
     const signoffs = await listSignoffs();
     const version = signoffs.filter((d) => d.sessionId === s.id).length + 1;
     const doc: SignoffDoc = {
@@ -195,7 +216,8 @@ export async function decideCycle(sessionId: string, _: FormState, f: FormData):
       code: `SO-${String(signoffs.length + 1).padStart(3, "0")}`,
       sessionId: s.id,
       version,
-      status: "menunggu",
+      status: "Draf",
+      history: [],
       createdAt: new Date().toISOString(),
       requestedBy: user.name,
       snapshot: {
@@ -209,15 +231,18 @@ export async function decideCycle(sessionId: string, _: FormState, f: FormData):
         result: run,
         decisionNotes: notes,
         followUps,
-        limitations: limitationsFor(s),
+        limitations: limitationsFor(run),
       },
     };
+    // Gambar 10.19: Draf (cantumkanSyarat) -> kirimPermintaanSignOff() -> Menunggu Keputusan.
+    transition(doc, "Draf", "Sistem", run.verdict.status === "LolosBersyarat" ? "Draf disusun; syarat Lolos Bersyarat dicantumkan" : "Draf disusun dari laporan alignment");
+    transition(doc, "MenungguKeputusan", user.name, "Permintaan sign-off dikirim");
     await put("sa_signoffs", doc);
     s.signoffId = doc.id;
     await audit(user, "Mengirim permintaan sign-off", doc.code, `${s.release} cycle ${s.cycleNo}`);
   }
   await put("sa_sessions", s);
-  await audit(user, decision === "promosi" ? "Memutuskan lanjut promosi" : "Memutuskan kembali ke Dev", s.code);
+  await audit(user, decision === "LanjutPromosi" ? "Memutuskan lanjut promosi" : "Memutuskan kembali ke Dev", s.code);
   revalidatePath("/", "layout");
   redirect(`/alignment/${s.id}?keputusan=1`);
 }

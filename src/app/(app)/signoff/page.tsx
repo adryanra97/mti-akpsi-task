@@ -5,11 +5,11 @@ import { EmptyState, PageHeader, Tag } from "@/components/ui";
 import { VerdictBadge } from "@/components/verdict";
 import { fmtDate } from "@/lib/format";
 import type { SignoffDoc } from "@/lib/types";
+import { SIGNOFF_STATUS_LABEL } from "@/lib/verdict";
 
 export const metadata: Metadata = { title: "Sign-off" };
 
-const TONE = { menunggu: "warn", disetujui: "pass", ditolak: "fail" } as const;
-const LABEL = { menunggu: "Menunggu keputusan", disetujui: "Disetujui", ditolak: "Ditolak" };
+const TONE = { Draf: "neutral", MenungguKeputusan: "warn", Disetujui: "pass", Ditolak: "fail" } as const;
 
 function Row({ d }: { d: SignoffDoc }) {
   return (
@@ -23,8 +23,8 @@ function Row({ d }: { d: SignoffDoc }) {
             {d.snapshot.service}, {d.snapshot.releaseCandidate}. Diminta {fmtDate(d.createdAt, true)} oleh {d.requestedBy}
           </span>
         </span>
-        <VerdictBadge verdict={d.snapshot.result.verdict} size="sm" />
-        <Tag tone={TONE[d.status]}>{LABEL[d.status]}</Tag>
+        <VerdictBadge verdict={d.snapshot.result.verdict.status} size="sm" />
+        <Tag tone={TONE[d.status]}>{SIGNOFF_STATUS_LABEL[d.status]}</Tag>
       </Link>
     </li>
   );
@@ -32,8 +32,8 @@ function Row({ d }: { d: SignoffDoc }) {
 
 export default async function SignoffList() {
   const docs = (await listSignoffs()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const pending = docs.filter((d) => d.status === "menunggu");
-  const done = docs.filter((d) => d.status !== "menunggu");
+  const pending = docs.filter((d) => d.status === "MenungguKeputusan" || d.status === "Draf");
+  const done = docs.filter((d) => d.status === "Disetujui" || d.status === "Ditolak");
   return (
     <>
       <PageHeader

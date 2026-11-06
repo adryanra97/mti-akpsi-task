@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
 import { put } from "@/lib/db";
 import { getIncident, listIncidents } from "@/lib/data";
-import { reportFromIncident } from "@/lib/domain";
-import { SERVICES } from "@/lib/core/twin";
+import { reportFromIncident, transition } from "@/lib/domain";
+import { SERVICES } from "@/lib/services";
 import type { Incident, IncidentType } from "@/lib/types";
 
 export interface IncFormState {
@@ -43,7 +43,7 @@ export async function createIncident(_: IncFormState, f: FormData): Promise<IncF
   const manual = String(f.get("manualSymptoms") ?? "").trim();
 
   if (!TYPES.includes(type)) errors.type = "Pilih tipe insiden.";
-  if (!SERVICES.some((s) => s.name === service)) errors.service = "Pilih layanan terkait.";
+  if (!SERVICES.some((s) => s.nama === service)) errors.service = "Pilih layanan terkait.";
   if (!title) errors.title = "Tulis judul singkat insiden.";
   if (!description) errors.description = "Jelaskan apa yang terjadi.";
   if (!release) errors.release = "Isi rilis atau rollout terkait.";
@@ -83,47 +83,49 @@ export async function createIncident(_: IncFormState, f: FormData): Promise<IncF
     code: `INC-${String(list.length + 1).padStart(3, "0")}`,
     createdAt: new Date().toISOString(),
     createdBy: user.name,
-    status: "baru",
+    status: "Dicatat",
+    history: [],
     data,
     repro: null,
     mitigations: [],
     needsEscalation: false,
-    notReproduced: false,
   };
+  transition(inc, "Dicatat", user.name, elk ? "catatDataInsiden()" : "catatDataInsiden() dan catatGejalaManual()");
   await put("sa_incidents", inc);
   await audit(user, "Membuka kasus insiden", inc.code, title);
   revalidatePath("/", "layout");
   redirect(`/incidents/${inc.id}`);
 }
 
+/** tutupPengujianOpsi() [tidak ada opsi Lolos] / tandaiPerluEskalasi(): Uji Mitigasi -> Perlu Eskalasi. */
 export async function markAllTested(id: string) {
   const user = await requirePermission("incident.manage");
   const inc = await getIncident(id);
-  if (!inc) return;
-  const pass = inc.mitigations.some((m) => m.result?.verdict === "LOLOS");
-  inc.needsEscalation = !pass;
+  if (!inc || inc.status !== "UjiMitigasi") return;
+  if (inc.mitigations.some((m) => m.result.verdict.status === "Lolos")) return;
+  inc.needsEscalation = true;
+  transition(inc, "PerluEskalasi", user.name, "Seluruh opsi diuji tanpa verdict Lolos");
   await put("sa_incidents", inc);
-  if (!pass) await audit(user, "Menandai laporan perlu eskalasi ke Technical Lead", inc.code);
+  await audit(user, "Menandai laporan perlu eskalasi ke Technical Lead", inc.code);
   revalidatePath("/", "layout");
 }
 
+/** pilihMitigasi(opsi) / susunLaporan(): Mitigasi Ditemukan, Perlu Eskalasi, atau Belum Tereproduksi -> Terdokumentasi. */
 export async function finalizeIncident(id: string, _: IncFormState, f: FormData): Promise<IncFormState> {
   const user = await requirePermission("incident.manage");
   const inc = await getIncident(id);
   if (!inc) return { error: "Insiden tidak ditemukan." };
-  if (!inc.repro) return { error: "Nilai kondisi insiden terlebih dahulu." };
-  const selected = String(f.get("mitigation") ?? "");
-  if (!inc.notReproduced) {
-    if (!inc.mitigations.length) return { error: "Uji minimal satu opsi mitigasi sebelum menyusun laporan." };
+  if (!["MitigasiDitemukan", "PerluEskalasi", "BelumTereproduksi"].includes(inc.status)) {
+    return { error: "Laporan disusun setelah mitigasi ditemukan, insiden ditandai perlu eskalasi, atau insiden belum tereproduksi." };
+  }
+  if (inc.status !== "BelumTereproduksi") {
+    const selected = String(f.get("mitigation") ?? "");
     if (!inc.mitigations.some((m) => m.id === selected)) return { errors: { mitigation: "Pilih mitigasi yang direkomendasikan." } };
     inc.selectedMitigationId = selected;
-    const chosen = inc.mitigations.find((m) => m.id === selected)!;
-    if (chosen.result?.verdict !== "LOLOS" && !inc.mitigations.some((m) => m.result?.verdict === "LOLOS")) inc.needsEscalation = true;
   }
-  inc.status = "selesai";
   inc.closedAt = new Date().toISOString();
-  inc.rootCauseAt ??= inc.repro.createdAt;
   inc.reportId = `rpt-${inc.id}`;
+  transition(inc, "Terdokumentasi", user.name, "Laporan insiden disusun");
   await put("sa_incidents", inc);
   await put("sa_reports", reportFromIncident(inc));
   await audit(user, "Menyimpan laporan insiden", inc.code);

@@ -2,10 +2,9 @@ import "server-only";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import type { AlignmentSession, Incident, ReportEntry, SignoffDoc, AnalysisResult } from "./types";
-import { VERDICT_LABEL } from "./verdict";
-import { RESOURCE_LABEL } from "./core/twin";
-import { INCIDENT_TYPE_LABEL, mttrMinutes } from "./domain";
-import { maskText } from "./core/masking";
+import { DECISION_LABEL, INCIDENT_STATUS_LABEL, LIMITING_LABEL, ROUTE_LABEL, SIGNOFF_STATUS_LABEL, VERDICT_LABEL } from "./verdict";
+import { INCIDENT_TYPE_LABEL, latestResult, mttrMinutes, peakSummary } from "./domain";
+import { maskText } from "./masking";
 import { KIND_LABEL } from "./reports";
 
 /** Font standar PDF hanya mendukung Latin-1; ganti simbol yang tidak tersedia. */
@@ -23,7 +22,7 @@ function t(s: string | number | null | undefined) {
 
 /** Penyamaran teks bebas sebelum keluar dari sistem dalam bentuk berkas. */
 function m(s: string | undefined) {
-  return t(maskText(s ?? "", { count: 0, kinds: [] }));
+  return t(maskText(s));
 }
 
 const fd = (iso?: string) =>
@@ -117,42 +116,58 @@ class Doc {
 }
 
 function indicatorRows(r: AnalysisResult) {
-  return r.scenarios.map((s) => [
-    s.label,
-    s.indicators ? `${s.indicators.cpuPct}%` : "-",
-    s.indicators ? `${s.indicators.memPct}%` : "-",
-    s.indicators ? `${s.indicators.threadSatPct}%` : "-",
-    s.indicators ? `${s.indicators.p95Ms} ms` : "-",
-    s.indicators ? `${s.indicators.errorRatePct}%` : "-",
-    VERDICT_LABEL[s.status],
-  ]);
+  return r.langkah.map((l) => {
+    const x = l.ringkasan;
+    return [
+      l.deskripsi,
+      x ? `${x.cpuPct}%` : "-",
+      x ? `${x.memPct}%` : "-",
+      x ? `${x.threadPct}%` : "-",
+      x ? `${x.p95Ms} ms` : "-",
+      x ? `${x.errorRatePct}%` : "-",
+      l.jalurPenjurusan ? ROUTE_LABEL[l.jalurPenjurusan] : "Dihentikan",
+      l.status ? VERDICT_LABEL[l.status] : "-",
+    ];
+  });
 }
 
 function analysisBlock(d: Doc, r: AnalysisResult, restricted: boolean) {
   d.h("Verdict");
+  const model = r.modelDigitalTwin;
   d.kv([
-    ["Verdict", VERDICT_LABEL[r.verdict]],
-    ["Kapasitas maksimum", r.maxTps !== null ? `${r.maxTps} TPS` : "Tidak dihitung"],
-    ["Sumber daya pembatas", r.limiting ? RESOURCE_LABEL[r.limiting] : "-"],
-    ["Mode analisis", r.mode === "demo" ? "Demo (digital twin bawaan)" : `${r.provider} ${r.model}`],
+    ["Verdict", VERDICT_LABEL[r.verdict.status]],
+    ["Sumber daya pembatas", r.sumberDayaPembatas ? LIMITING_LABEL[r.sumberDayaPembatas] : "-"],
+    ["Kapasitas maksimum", r.kapasitas ? `${r.kapasitas.kapasitasMaksTps} TPS` : "Tidak dihitung"],
+    ["Mode analisis", r.modeAnalisis === "demo" ? "Demo (narasi templat)" : `${r.provider ?? "-"} ${r.model ?? ""}`],
+    ["Model digital twin", model ? `${model.versiModel}, kalibrasi ${fd(model.tanggalKalibrasi ?? undefined)}` : "-"],
   ]);
-  d.p(r.narrative);
-  if (r.reasons.length) {
+  d.p(m(r.verdict.narasi));
+  if (r.verdict.alasan.length) {
     d.h("Alasan");
-    r.reasons.forEach((x) => d.p(`- ${x}`));
+    r.verdict.alasan.forEach((x) => d.p(`- ${m(x)}`));
   }
-  if (r.conditions.length || r.manualVerification.length) {
+  const manual = r.langkah.filter((l) => l.perluVerifikasiManual).map((l) => `${l.deskripsi}: estimasi penalaran, perlu verifikasi manual`);
+  if (r.verdict.syarat.length || manual.length) {
     d.h("Syarat dan angka yang perlu verifikasi manual");
-    [...r.conditions, ...r.manualVerification].forEach((x) => d.p(`- ${x}`, [154, 88, 0]));
+    [...r.verdict.syarat, ...manual].forEach((x) => d.p(`- ${m(x)}`, [154, 88, 0]));
   }
-  d.h("Indikator sumber daya");
+  d.h("Indikator sumber daya per langkah");
   if (restricted) d.p("Data dibatasi perjanjian kerahasiaan; hanya ringkasan agregat yang disertakan.");
-  else d.table(["Skenario", "CPU", "Memori", "Thread pool", "p95", "Error", "Status"], indicatorRows(r));
+  else d.table(["Langkah", "CPU", "Memori", "Thread", "p95", "Error", "Sumber", "Status"], indicatorRows(r));
+  if (r.kapasitas && !restricted) {
+    const L = r.kapasitas.littlesLaw;
+    d.h("Perencanaan kapasitas (Little's Law)");
+    d.p(`L = lambda x W = ${L.lambdaTps} x ${L.wDetik} s = ${L.lRequest} request bersamaan. Thread tersedia ${L.threadTersediaPerNode} per node, disarankan ${L.threadDisarankanPerNode} per node.`);
+  }
+  if (r.rencanaUji.length) {
+    d.h("Rencana uji yang disarankan");
+    d.table(["#", "Uji", "Profil beban", "Durasi", "Kriteria lulus"], r.rencanaUji.map((u) => [u.urutan, u.nama, u.profilBeban, `${u.durasiMenit} menit`, u.kriteriaLulus]));
+  }
 }
 
 export function alignmentPdf(s: AlignmentSession, rep: ReportEntry) {
   const d = new Doc();
-  const r = s.runs.at(-1)!;
+  const r = latestResult(s)!;
   d.header(`Laporan alignment ${s.release} cycle ${s.cycleNo}`, `${s.service}, release candidate ${s.releaseCandidate}, ${s.envSource} ke ${s.envTarget}. Alignment ${fd(s.scheduledAt)}.`, rep.restricted);
   d.h("Parameter analisis");
   const p = s.params!;
@@ -167,7 +182,7 @@ export function alignmentPdf(s: AlignmentSession, rep: ReportEntry) {
   analysisBlock(d, r, rep.restricted);
   d.h("Keputusan cycle");
   d.kv([
-    ["Keputusan", s.decision === "promosi" ? "Lanjut promosi ke Production" : "Kembali ke Dev"],
+    ["Keputusan", s.decision ? DECISION_LABEL[s.decision] : "-"],
     ["Dicatat oleh", `${s.decidedBy ?? "-"}, ${fd(s.decidedAt)}`],
     ["Ringkasan", m(s.decisionNotes)],
   ]);
@@ -185,14 +200,14 @@ export function signoffPdf(doc: SignoffDoc, rep: ReportEntry) {
     rep.restricted,
   );
   d.kv([
-    ["Status", doc.status === "disetujui" ? "DISETUJUI" : doc.status === "ditolak" ? "DITOLAK" : "MENUNGGU"],
+    ["Status", SIGNOFF_STATUS_LABEL[doc.status].toUpperCase()],
     ["Keputusan oleh", `${doc.decidedBy ?? "-"}, ${fd(doc.decidedAt)}`],
     ["Catatan", m(doc.pmNotes) || "-"],
     ["Dikunci", fd(doc.lockedAt)],
   ]);
   analysisBlock(d, s.result, rep.restricted);
   d.h("Sumber setiap angka");
-  s.result.scenarios.forEach((x) => d.p(`- ${x.label}: ${x.route === "digital_twin" ? "digital twin" : x.route === "estimasi_penalaran" ? "estimasi penalaran" : x.route === "fallback_twin" ? "digital twin (fallback)" : "dihentikan"}`));
+  s.result.langkah.forEach((x) => d.p(`- ${x.deskripsi}: ${x.jalurPenjurusan ? ROUTE_LABEL[x.jalurPenjurusan] : "dihentikan"}`));
   d.h("Catatan tindak lanjut");
   d.p(m(s.decisionNotes));
   s.followUps.forEach((f) => d.p(`- ${m(f)}`));
@@ -212,27 +227,21 @@ export function incidentPdf(inc: Incident, rep: ReportEntry) {
     ["Deskripsi", rep.restricted ? "Disamarkan (terbatas NDA)" : m(data.description)],
     ["Beban", `Puncak ${data.peakRps} RPS, rata-rata ${data.avgRps} RPS, ${data.durationMin} menit`],
     ["Spesifikasi", `${data.spec.vcpu} vCPU, ${data.spec.ramGb} GB, ${data.spec.nodes} node`],
-    ["Status reproduksi", inc.notReproduced ? "Belum tereproduksi, perlu kalibrasi ulang model" : "Tereproduksi pada spesifikasi saat ini"],
-    ["Sumber daya pembatas", inc.repro?.limiting ? RESOURCE_LABEL[inc.repro.limiting] : "-"],
+    ["Status kasus", INCIDENT_STATUS_LABEL[inc.status]],
+    ["Status reproduksi", inc.repro?.statusReproduksi === "Tereproduksi" ? "Tereproduksi pada spesifikasi saat ini" : inc.repro ? "Belum tereproduksi, perlu kalibrasi ulang model" : "Belum dijalankan"],
+    ["Sumber daya pembatas", inc.repro?.sumberDayaPembatas ? LIMITING_LABEL[inc.repro.sumberDayaPembatas] : "-"],
   ]);
-  if (inc.repro?.rootCauses.length) {
+  if (inc.repro?.kemungkinanAkarMasalah.length) {
     d.h("Kemungkinan akar masalah");
-    inc.repro.rootCauses.forEach((c) => d.p(`- ${c}`));
+    inc.repro.kemungkinanAkarMasalah.forEach((c) => d.p(`- ${m(c)}`));
   }
   d.h("Verdict sebelum dan sesudah mitigasi");
-  d.table(
-    ["Kondisi", "Verdict", "CPU", "Memori", "p95"],
-    [
-      ["Spesifikasi saat ini", inc.repro ? VERDICT_LABEL[inc.repro.verdict] : "-", rep.restricted ? "agregat" : `${inc.repro?.indicators?.cpuPct ?? "-"}%`, rep.restricted ? "agregat" : `${inc.repro?.indicators?.memPct ?? "-"}%`, rep.restricted ? "agregat" : `${inc.repro?.indicators?.p95Ms ?? "-"} ms`],
-      ...inc.mitigations.map((x) => [
-        `${x.label}${x.id === inc.selectedMitigationId ? " (terpilih)" : ""}`,
-        x.result ? VERDICT_LABEL[x.result.verdict] : "-",
-        `${x.result?.indicators?.cpuPct ?? "-"}%`,
-        `${x.result?.indicators?.memPct ?? "-"}%`,
-        `${x.result?.indicators?.p95Ms ?? "-"} ms`,
-      ]),
-    ],
-  );
+  const row = (label: string, r: AnalysisResult | null) => {
+    const x = peakSummary(r);
+    const agg = rep.restricted;
+    return [label, r ? VERDICT_LABEL[r.verdict.status] : "-", agg ? "agregat" : `${x?.cpuPct ?? "-"}%`, agg ? "agregat" : `${x?.memPct ?? "-"}%`, agg ? "agregat" : `${x?.p95Ms ?? "-"} ms`];
+  };
+  d.table(["Kondisi", "Verdict", "CPU", "Memori", "p95"], [row("Spesifikasi saat ini", inc.repro), ...inc.mitigations.map((x) => row(`${x.label}${x.id === inc.selectedMitigationId ? " (terpilih)" : ""}`, x.result))]);
   d.kv([
     ["Mitigasi terpilih", chosen?.label ?? "-"],
     ["Perlu eskalasi", inc.needsEscalation ? "Ya, ke Technical Lead" : "Tidak"],

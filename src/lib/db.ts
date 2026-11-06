@@ -2,7 +2,7 @@ import "server-only";
 
 type Query = (text: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
 
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 export const TABLES = ["sa_sessions", "sa_incidents", "sa_signoffs", "sa_reports", "sa_audit", "sa_settings"] as const;
 export type Table = (typeof TABLES)[number];

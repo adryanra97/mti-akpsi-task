@@ -8,14 +8,16 @@ import { ButtonLink, EmptyState, PageHeader, Tag } from "@/components/ui";
 import { VerdictBadge } from "@/components/verdict";
 import { Glossary } from "@/components/glossary";
 import { fmtDate } from "@/lib/format";
-import { SESSION_STATUS_LABEL } from "@/lib/domain";
+import { DECISION_LABEL, SESSION_STATUS_LABEL } from "@/lib/verdict";
+import { latestResult } from "@/lib/domain";
 import type { AlignmentSession } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Alignment rilis" };
 
 function statusTone(s: AlignmentSession) {
-  if (s.status === "diputuskan") return s.decision === "promosi" ? "pass" : "neutral";
-  if (s.status === "dianalisis") return "accent";
+  if (s.status === "Diputuskan" || s.status === "Ditutup") return s.decision === "LanjutPromosi" ? "pass" : "neutral";
+  if (s.status === "Peninjauan") return "accent";
+  if (s.status === "Terjadwal") return "neutral";
   return "warn";
 }
 
@@ -63,7 +65,7 @@ export default async function AlignmentList() {
               </header>
               <ol>
                 {list.map((s) => {
-                  const run = s.runs.at(-1);
+                  const run = latestResult(s);
                   return (
                     <li key={s.id} className="border-b border-line last:border-0">
                       <Link
@@ -81,11 +83,11 @@ export default async function AlignmentList() {
                           </span>
                         </span>
                         <span className="col-start-2 sm:col-start-auto">
-                          {run ? <VerdictBadge verdict={run.verdict} size="sm" /> : <span className="text-[13px] text-ink-3">Belum dianalisis</span>}
+                          {run ? <VerdictBadge verdict={run.verdict.status} size="sm" /> : <span className="text-[13px] text-ink-3">Belum dianalisis</span>}
                         </span>
                         <span className="col-start-2 sm:col-start-auto">
                           <Tag tone={statusTone(s)}>
-                            {s.decision === "promosi" ? "Lanjut promosi" : s.decision === "kembali_dev" ? "Kembali ke Dev" : SESSION_STATUS_LABEL[s.status]}
+                            {s.decision ? DECISION_LABEL[s.decision] : SESSION_STATUS_LABEL[s.status]}
                           </Tag>
                         </span>
                         <span className="hidden text-ink-3 sm:block" aria-hidden>›</span>

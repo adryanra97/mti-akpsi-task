@@ -1,9 +1,52 @@
+// Tipe domain mengikuti structural model (Bab 9) dan enumerasi Tabel 9.30 dokumen AKPSI Kelompok C6.
+
 export type Role = "TL" | "QA" | "IE" | "PM" | "SUP";
 
-export type Verdict = "LOLOS" | "LOLOS_BERSYARAT" | "TIDAK_LOLOS" | "TIDAK_DAPAT_DINILAI";
+/** StatusVerdict (Tabel 9.30) */
+export type Verdict = "Lolos" | "LolosBersyarat" | "TidakLolos" | "TidakDapatDinilai";
 
-export type ResourceKey = "cpu" | "mem" | "net" | "thread" | "conn";
+/** StatusSesi (Tabel 9.30, Gambar 10.16) */
+export type SessionStatus = "Terjadwal" | "PengisianParameter" | "MenungguHasil" | "Peninjauan" | "Diputuskan" | "Ditutup";
 
+/** KeputusanCycle (Tabel 9.30) */
+export type CycleDecision = "LanjutPromosi" | "KembaliKeDev";
+
+/** TipeInsiden (Tabel 9.30) */
+export type IncidentType = "traffic_spike" | "memory_leak" | "batch_overlap" | "lainnya";
+
+/** StatusInsiden (Tabel 9.30, Gambar 10.18) */
+export type IncidentStatus =
+  | "Dicatat"
+  | "DalamReproduksi"
+  | "Tereproduksi"
+  | "BelumTereproduksi"
+  | "UjiMitigasi"
+  | "MitigasiDitemukan"
+  | "PerluEskalasi"
+  | "Terdokumentasi";
+
+/** StatusDokumen (Tabel 9.30, Gambar 10.19) */
+export type SignoffStatus = "Draf" | "MenungguKeputusan" | "Disetujui" | "Ditolak";
+
+/** StatusPermintaan (Tabel 9.30, Gambar 10.17) */
+export type RequestStatus = "Diterima" | "Disamarkan" | "Direncanakan" | "Dijalankan" | "Dihentikan" | "Dinilai" | "Selesai";
+
+/** JalurPenjurusan (Tabel 9.30) */
+export type Route = "DigitalTwin" | "EstimasiPenalaran" | "FallbackDigitalTwin";
+
+/** ModeAnalisis (Tabel 9.30) */
+export type AnalysisMode = "Alignment" | "ReproduksiInsiden" | "Mitigasi";
+
+export type Limiting = "CPU" | "Memori" | "Jaringan" | "ThreadPool" | "ConnectionPool" | "Database" | "DependensiEksternal";
+
+export interface StatusEvent<S extends string> {
+  status: S;
+  at: string;
+  by: string;
+  note?: string;
+}
+
+/** SpesifikasiSistem */
 export interface Spec {
   vcpu: number;
   ramGb: number;
@@ -11,6 +54,7 @@ export interface Spec {
   threadPool: number;
   connPool: number;
   bandwidthMbps: number;
+  timeoutMs?: number;
 }
 
 export interface Criteria {
@@ -30,10 +74,11 @@ export interface DevSummary {
   notes: string;
 }
 
+/** ParameterAnalisis */
 export interface AlignmentParams {
   normalTps: number;
   peakTps: number;
-  whatIf: number[]; // pengali beban dari kondisi puncak, mis. [2, 3]
+  whatIf: number[]; // pengali dari beban normal (FR-03, NFR-04)
   serviceVersion: string;
   configChanges: string;
   criteria: Criteria;
@@ -42,88 +87,194 @@ export interface AlignmentParams {
   prodSpec: Spec;
 }
 
-export interface Indicators {
+/** Ringkasan satu jalan simulasi pada ModelDigitalTwin (atau hasil estimasi). */
+export interface StepSummary {
   tps: number;
+  throughputTps?: number;
   cpuPct: number;
   memPct: number;
   netPct: number;
-  threadSatPct: number;
-  connSatPct: number;
+  threadPct: number;
+  connPct: number;
+  p50Ms?: number;
   p95Ms: number;
+  p99Ms?: number;
+  rataLatensiMs?: number;
   errorRatePct: number;
+  timeoutPct?: number;
+  jumlahRequest?: number;
 }
 
-export type StepRoute = "digital_twin" | "estimasi_penalaran" | "fallback_twin" | "dihentikan";
+export interface SeriesPoint {
+  t: number;
+  cpu: number;
+  mem: number;
+  net: number;
+  thread: number;
+  conn: number;
+  p95: number | null;
+}
 
-export interface TraceStep {
+/** SkenarioBeban */
+export interface LoadScenario {
+  namaSkenario: string;
+  tpsDasar: number;
+  pengali: number;
+  tpsTarget: number;
+  polaBeban: string;
+  durasiMenit: number;
+  campuranTransaksi: string;
+}
+
+/** LangkahAnalisis */
+export interface AnalysisStep {
+  urutan: number;
+  kunci: string;
+  deskripsi: string;
+  alat: string;
+  skenario: LoadScenario | null;
+  dalamCakupanModel: boolean;
+  jalurPenjurusan: Route | null;
+  skorKeyakinan: number | null;
+  kesepakatanSampel: number | null;
+  statusLangkah: "Menunggu" | "Selesai" | "Dihentikan";
+  perluVerifikasiManual: boolean;
+  estimasiBiaya: number;
+  ringkasan: StepSummary | null;
+  deretWaktu: SeriesPoint[];
+  komponenLatensiMs: Record<string, number>;
+  pelanggaran: string[];
+  status: Verdict | null;
+  catatan: string;
+}
+
+/** IndikatorSumberDaya */
+export interface ResourceIndicator {
+  jenis: "CPU" | "Memori" | "Jaringan" | "ThreadPool" | "KapasitasTransaksiMaks" | "ErrorRate" | "ResponseTime";
+  label: string;
+  nilai: number;
+  satuan: string;
+  kapasitasSpesifikasi: string;
+  rasioUtilisasi: number | null;
+  sumberAngka: Route;
+  perluVerifikasiManual: boolean;
+}
+
+/** MetrikBaseline */
+export interface Baseline {
+  environment: string;
+  jenisPeriode: "Baseline" | "PeriodeInsiden";
+  periodeMulai?: string;
+  periodeSelesai?: string;
+  cpuRataPersen: number;
+  memoriRataPersen: number;
+  throughputTps: number;
+  puncakTps: number;
+  errorRatePersen: number;
+  responseTimeP95Ms: number;
+  sumber: "ELKLangsung" | "TersimpanTerakhir";
+  tanggalPengambilan: string;
+}
+
+export interface DigitalTwinModel {
+  versiModel: string;
+  statusAktif: boolean;
+  tanggalKalibrasi: string | null;
+  tpsMinTerkalibrasi: number;
+  tpsMaksTerkalibrasi: number;
+  cakupanKomponen: string[];
+}
+
+export interface Capacity {
+  kapasitasMaksTps: number;
+  pembatas: Limiting;
+  perSumberDaya: { sumber: Limiting; kapasitasTps: number; rumus: string }[];
+  littlesLaw: { lambdaTps: number; wDetik: number; lRequest: number; threadTersediaPerNode: number; threadDisarankanPerNode: number };
+}
+
+export interface TestPlanStep {
+  urutan: number;
+  nama: string;
+  profilBeban: string;
+  durasiMenit: number;
+  kriteriaLulus: string;
+  alasan: string;
+}
+
+export interface TraceEntry {
   id: string;
   label: string;
-  route: StepRoute | "sistem" | "llm";
-  confidence?: number;
-  sampleAgreement?: number;
-  note: string;
-  durationMs: number;
+  jalur: string;
+  catatan: string;
+  skorKeyakinan: number | null;
+  kesepakatanSampel: number | null;
+  durasiMs: number;
 }
 
-export interface ScenarioResult {
-  key: string;
-  label: string;
-  kind: "normal" | "puncak" | "whatif";
-  tps: number;
-  route: StepRoute;
-  indicators: Indicators | null;
-  limiting: ResourceKey | null;
-  status: Verdict;
-  violations: string[];
-  confidence?: number;
-}
-
-export interface Baseline {
-  source: "elk" | "cache";
-  takenAt: string;
-  window: string;
-  avgTps: number;
-  peakTps: number;
-  cpuPct: number;
-  memPct: number;
-  p95Ms: number;
-  errorRatePct: number;
-}
-
-export interface CostInfo {
-  calls: number;
-  inputTokens: number;
-  outputTokens: number;
-  usd: number;
-  idr: number;
-}
-
+/** HasilAnalisis beserta Verdict, RencanaAnalisis, dan JejakKeputusan dari satu PermintaanAnalisis. */
 export interface AnalysisResult {
+  idPermintaan: string;
+  mode: AnalysisMode;
+  modeAnalisis: "demo" | "llm";
+  provider: string | null;
+  model: string | null;
+  statusPermintaan: RequestStatus;
+  alasanDihentikan: string | null;
+  waktuDiterima: string;
+  waktuSelesai: string;
+  penyamaran: { jumlah: number; jenis: string[] };
+  metrikBaseline: Baseline;
+  metrikPeriodeInsiden: Record<string, unknown> | null;
+  modelDigitalTwin: DigitalTwinModel | null;
+  kalibrasi: {
+    acuanTps: number;
+    acuanP95Ms: number;
+    p95SimulasiMs: number;
+    galatPersen: number;
+    cpuMsPerRequest: number;
+    tungguDatabaseMs: number;
+    tungguEksternalMs: number;
+    sumber: string;
+  } | null;
+  spesifikasi: Spec | null;
+  kriteria: Criteria;
+  rencana: { ringkasanTujuan: string; waktuDisusun: string; langkah: { urutan: number; deskripsi: string; alat: string; acuan: string; catatanLLM?: string }[] };
+  langkah: AnalysisStep[];
+  indikator: ResourceIndicator[];
+  kapasitas: Capacity | null;
+  sumberDayaPembatas: Limiting | null;
+  penyebabBottleneck: string[];
+  statusReproduksi: "Tereproduksi" | "TidakTereproduksi" | "TidakDapatDinilai" | null;
+  kemungkinanAkarMasalah: string[];
+  adaAngkaEstimasi: boolean;
+  verdict: { status: Verdict; alasan: string[]; syarat: string[]; narasi: string; waktuDitetapkan: string };
+  rencanaUji: TestPlanStep[];
+  jejak: {
+    idJejak: string;
+    waktuMulai: string;
+    waktuSelesai: string;
+    durasiProsesMs: number;
+    versiModelDigitalTwin: string | null;
+    versiModelLLM: string | null;
+    versiPrompt: string;
+    jumlahPengirimanKeLLM: number;
+    biaya: { pengiriman: number; tokenMasuk: number; tokenKeluar: number; usd: number; idr: number };
+    langkah: TraceEntry[];
+  };
+  peringatan: string[];
+  mitigasi: { label: string; changes: MitigationChanges } | null;
+}
+
+/** Satu jalan analisis yang tersimpan pada sesi, beserta versi parameter yang dipakai. */
+export interface AnalysisRun {
   id: string;
   createdAt: string;
   createdBy: string;
-  mode: "demo" | "llm";
-  provider?: string;
-  model?: string;
   params: AlignmentParams;
-  scenarios: ScenarioResult[];
-  maxTps: number | null;
-  limiting: ResourceKey | null;
-  verdict: Verdict;
-  reasons: string[];
-  conditions: string[];
-  manualVerification: string[];
-  narrative: string;
-  baseline: Baseline;
-  masking: { count: number; kinds: string[] };
-  trace: TraceStep[];
-  cost: CostInfo;
-  warnings: string[];
+  result: AnalysisResult;
 }
 
-export type SessionStatus = "menunggu_parameter" | "siap_dianalisis" | "dianalisis" | "diputuskan";
-export type CycleDecision = "promosi" | "kembali_dev";
-
+/** SesiAlignment */
 export interface AlignmentSession {
   id: string;
   code: string;
@@ -136,9 +287,12 @@ export interface AlignmentSession {
   scheduledAt: string;
   createdAt: string;
   status: SessionStatus;
+  history: StatusEvent<SessionStatus>[];
   params: AlignmentParams | null;
   paramsBy?: string;
-  runs: AnalysisResult[];
+  paramVersion?: number;
+  pendingRequestId?: string;
+  runs: AnalysisRun[];
   decision?: CycleDecision;
   decisionNotes?: string;
   followUps?: string[];
@@ -148,8 +302,6 @@ export interface AlignmentSession {
   signoffId?: string;
   draftFrom?: string;
 }
-
-export type IncidentType = "traffic_spike" | "memory_leak" | "batch_overlap" | "lainnya";
 
 export interface IncidentData {
   type: IncidentType;
@@ -178,63 +330,42 @@ export interface MitigationChanges {
   timeoutMs?: number;
 }
 
-export interface Assessment {
-  id: string;
-  createdAt: string;
-  mode: "demo" | "llm";
-  provider?: string;
-  model?: string;
-  kind: "reproduksi" | "mitigasi";
-  reproduced: boolean | null;
-  indicators: Indicators | null;
-  limiting: ResourceKey | null;
-  rootCauses: string[];
-  verdict: Verdict;
-  reasons: string[];
-  manualVerification: string[];
-  narrative: string;
-  baseline: Baseline;
-  masking: { count: number; kinds: string[] };
-  trace: TraceStep[];
-  cost: CostInfo;
-  warnings: string[];
-}
-
+/** OpsiMitigasi */
 export interface Mitigation {
   id: string;
   label: string;
   changes: MitigationChanges;
-  result: Assessment | null;
+  result: AnalysisResult;
   createdAt: string;
 }
 
-export type IncidentStatus = "baru" | "dinilai" | "mitigasi" | "selesai";
-
+/** KasusInsiden */
 export interface Incident {
   id: string;
   code: string;
   createdAt: string;
   createdBy: string;
   status: IncidentStatus;
+  history: StatusEvent<IncidentStatus>[];
   data: IncidentData;
-  repro: Assessment | null;
+  pendingRequestId?: string;
+  repro: AnalysisResult | null;
   mitigations: Mitigation[];
   selectedMitigationId?: string;
   needsEscalation: boolean;
-  notReproduced: boolean;
   rootCauseAt?: string;
   closedAt?: string;
   reportId?: string;
 }
 
-export type SignoffStatus = "menunggu" | "disetujui" | "ditolak";
-
+/** DokumenSignOff */
 export interface SignoffDoc {
   id: string;
   code: string;
   sessionId: string;
   version: number;
   status: SignoffStatus;
+  history: StatusEvent<SignoffStatus>[];
   createdAt: string;
   requestedBy: string;
   snapshot: {
