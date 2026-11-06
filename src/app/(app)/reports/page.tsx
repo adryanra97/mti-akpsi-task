@@ -3,7 +3,7 @@
  */
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Download, FileSpreadsheet, Lock } from "lucide-react";
+import { Activity, CheckCircle2, Download, FileSpreadsheet, Lock, ShieldAlert, TrendingUp } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
 import { listAudit, listIncidents, listReports, listSessions } from "@/lib/data";
@@ -64,13 +64,57 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   const incScoped = incidents.filter((i) => (!filter.service || i.data.service === filter.service) && (!filter.release || i.data.release === filter.release));
   const incData = [...new Set(incScoped.map((i) => i.data.release))].sort().map((r) => ({ release: r, count: incScoped.filter((i) => i.data.release === r).length }));
   const downloads = auditLog.filter((a) => a.action.startsWith("Unduh")).slice(0, 6);
+  const approved = decided.filter((s) => s.decision === "LanjutPromosi").length;
+  const returned = decided.filter((s) => s.decision === "KembaliKeDev").length;
+  const evaluated = decided.length;
+  const passPct = evaluated > 0 ? Math.round((approved / evaluated) * 100) : null;
+  const activeIncidents = incScoped.filter((i) => i.status !== "Terdokumentasi").length;
+  const cpuValues = cpuSeries.flatMap((s) => s.points.map((p) => p.cpu)).filter((n): n is number => n !== null && Number.isFinite(n));
+  const highestCpu = cpuValues.length ? Math.max(...cpuValues) : null;
 
   return (
     <>
       <PageHeader
         title="Report"
-        description="Laporan alignment per sprint cycle, dokumen sign-off, dan laporan insiden. Ringkasan tren di bawah menjadi pengantar; analisis tren lanjutan disusun di luar sistem."
+        description="Pantau kualitas keputusan rilis, tren kapasitas, insiden, dan riwayat laporan dalam satu tempat."
       />
+
+      <section aria-labelledby="report-intelligence-title" className="mb-6">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-accent">Operational intelligence</p>
+            <h2 id="report-intelligence-title" className="mt-1 text-[21px]">Ringkasan kinerja rilis</h2>
+          </div>
+          <span className="text-[12.5px] text-ink-3">Mengikuti filter layanan, rilis, dan tanggal untuk sesi alignment</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Cycle dievaluasi", value: fmtNum(evaluated, 0), detail: "Sesi dengan hasil analisis", Icon: Activity, color: "text-accent", soft: "bg-accent-soft" },
+            { label: "Lanjut promosi", value: fmtNum(approved, 0), detail: passPct === null ? "Belum ada keputusan" : `${passPct}% dari cycle dievaluasi`, Icon: CheckCircle2, color: "text-pass", soft: "bg-pass-soft" },
+            { label: "Kembali ke Dev", value: fmtNum(returned, 0), detail: "Perlu perbaikan sebelum promosi", Icon: ShieldAlert, color: "text-cond", soft: "bg-cond-soft" },
+            { label: "Insiden aktif", value: fmtNum(activeIncidents, 0), detail: "Belum terdokumentasi selesai", Icon: TrendingUp, color: "text-fail", soft: "bg-fail-soft" },
+          ].map(({ label, value, detail, Icon, color, soft }) => (
+            <div key={label} className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-[13px] font-medium text-ink-2">{label}</p>
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${soft} ${color}`}><Icon className="h-[18px] w-[18px]" aria-hidden /></span>
+              </div>
+              <p className="mt-3 font-display text-[32px] font-bold leading-none tracking-tight">{value}</p>
+              <p className="mt-2 text-[12.5px] text-ink-3">{detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3 text-[13.5px]">
+          <p className="text-ink-2">
+            <strong className="text-ink">Insight:</strong>{" "}
+            {evaluated === 0
+              ? "Belum tersedia cycle yang telah diputuskan untuk dianalisis."
+              : `${approved} dari ${evaluated} cycle melanjutkan promosi. ${returned} kembali ke Dev.`}
+            {highestCpu !== null && ` CPU puncak tertinggi tercatat ${fmtNum(highestCpu)}% pada skenario beban puncak.`}
+          </p>
+          <a href="#tren" className="shrink-0 font-semibold text-accent hover:underline">Lihat tren ↓</a>
+        </div>
+      </section>
 
       <form method="get" className="mb-6 rounded-xl border border-line bg-surface p-4" aria-label="Filter laporan">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] lg:items-end">
@@ -124,7 +168,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         </div>
       </form>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div id="tren" className="grid scroll-mt-6 gap-6 lg:grid-cols-2">
         <Panel title="Verdict per sprint cycle" description="Verdict terakhir yang diputuskan pada setiap cycle" className="lg:col-span-2">
           {releaseOrder.length === 0 ? (
             <p className="text-[14px] text-ink-3">Tidak ada cycle yang diputuskan pada filter ini.</p>
