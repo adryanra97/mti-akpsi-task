@@ -1,3 +1,8 @@
+/**
+ * Halaman detail sesi alignment: parameter, hasil Core Module, perbandingan cycle, dan keputusan.
+ *
+ * Bila hasil sudah ada, verdict dan keputusan tampil lebih dulu daripada parameter (NFR-08).
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,6 +23,18 @@ import { fmtDate, fmtNum } from "@/lib/format";
 import { DECISION_LABEL, SESSION_STATUS_LABEL, SIGNOFF_STATUS_LABEL } from "@/lib/verdict";
 import type { AlignmentSession, AnalysisResult, SessionStatus } from "@/lib/types";
 
+/**
+ * Judul tab browser untuk sesi alignment.
+ *
+ * Parameters
+ * ----------
+ * params : Promise<{ id: string }>
+ *     Parameter rute.
+ *
+ * Returns
+ * -------
+ * Promise<Metadata>
+ */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const s = await getSession((await params).id);
   return { title: s ? `${s.release} cycle ${s.cycleNo}` : "Sesi alignment" };
@@ -25,6 +42,24 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 const STATES: SessionStatus[] = ["Terjadwal", "PengisianParameter", "MenungguHasil", "Peninjauan", "Diputuskan", "Ditutup"];
 
+/**
+ * Selisih indikator dibanding cycle sebelumnya, berwarna sesuai arah perbaikan.
+ *
+ * Parameters
+ * ----------
+ * now : number | null, optional
+ *     Nilai cycle ini.
+ * before : number | null, optional
+ *     Nilai cycle sebelumnya.
+ * unit : string
+ *     Satuan selisih.
+ * lowerIsBetter : boolean, default true
+ *     Arah perbaikan; false untuk kapasitas.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function Delta({ now, before, unit, lowerIsBetter = true }: { now?: number | null; before?: number | null; unit: string; lowerIsBetter?: boolean }) {
   if (now == null || before == null) return <span className="text-ink-3">–</span>;
   const d = now - before;
@@ -39,6 +74,20 @@ function Delta({ now, before, unit, lowerIsBetter = true }: { now?: number | nul
   );
 }
 
+/**
+ * Tabel perbandingan verdict dan indikator puncak dengan cycle sebelumnya.
+ *
+ * Parameters
+ * ----------
+ * run : AnalysisResult
+ *     Hasil cycle ini.
+ * prev : { s: AlignmentSession; r: AnalysisResult } | null
+ *     Sesi dan hasil cycle sebelumnya, atau null.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function Comparison({ run, prev }: { run: AnalysisResult; prev: { s: AlignmentSession; r: AnalysisResult } | null }) {
   if (!prev) return <p className="text-[14px] text-ink-3">Belum ada cycle sebelumnya untuk rilis ini.</p>;
   const a = peakSummary(run);
@@ -81,6 +130,20 @@ function Comparison({ run, prev }: { run: AnalysisResult; prev: { s: AlignmentSe
   );
 }
 
+/**
+ * Halaman detail sesi alignment.
+ *
+ * Parameters
+ * ----------
+ * params : Promise<{ id: string }>
+ *     Identitas sesi.
+ * searchParams : Promise<{ keputusan?: string }>
+ *     "keputusan" terisi setelah keputusan cycle tersimpan.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function SessionPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ keputusan?: string }> }) {
   const user = await requireUser();
   const { id } = await params;

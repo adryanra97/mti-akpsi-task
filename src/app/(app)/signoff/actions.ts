@@ -1,5 +1,8 @@
 "use server";
 
+/**
+ * Server action UC-04 Terbitkan Dokumen Sign-Off (state machine Gambar 10.19).
+ */
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
@@ -13,6 +16,25 @@ export interface SoState {
   values?: Record<string, string>;
 }
 
+/**
+ * Mencatat keputusan Project/Technical Manager: Menunggu Keputusan -> Disetujui atau Ditolak.
+ *
+ * Dokumen dikunci dengan nomor versi dan tanda waktu, lalu laporan sign-off disimpan.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas dokumen (diikat dengan bind).
+ * _ : SoState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     decision ("Disetujui" atau "Ditolak") dan notes (wajib bila ditolak).
+ *
+ * Returns
+ * -------
+ * Promise<SoState>
+ *     Galat validasi; bila berhasil, dialihkan ke halaman dokumen.
+ */
 export async function decideSignoff(id: string, _: SoState, f: FormData): Promise<SoState> {
   const user = await requirePermission("signoff.decide");
   const doc = await getSignoff(id);

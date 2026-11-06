@@ -1,9 +1,25 @@
 """AgenAnalisis: orkestrator Core Module ServerAgent (Bab 4.1.3, kartu CRC 9 sampai 20, Gambar 10.2 sampai 10.4).
 
-Agen menerima satu PermintaanAnalisis, menyamarkan data, mengambil metrik dari ELK, meminta rencana kepada
-Layanan LLM, menjuruskan setiap langkah ke ModelDigitalTwin atau EstimatorPenalaran, menghitung indikator,
-menetapkan verdict, meminta narasi, lalu mencatat JejakKeputusan. Status permintaan mengikuti state machine
-PermintaanAnalisis: Diterima, Disamarkan, Direncanakan, Dijalankan, (Dihentikan), Dinilai, Selesai.
+Agen menerima satu PermintaanAnalisis, menyamarkan data, mengambil metrik dari ELK, meminta
+rencana kepada Layanan LLM, menjuruskan setiap langkah ke ModelDigitalTwin atau
+EstimatorPenalaran, menghitung indikator, menetapkan verdict, meminta narasi, lalu mencatat
+JejakKeputusan. Status permintaan mengikuti state machine PermintaanAnalisis: Diterima,
+Disamarkan, Direncanakan, Dijalankan, (Dihentikan), Dinilai, Selesai.
+
+Attributes
+----------
+REGISTRI : dict
+    Isi ``registry.json``: layanan, model digital twin, baseline, dan komponen di luar cakupan.
+KRITERIA_SLA : dict
+    Kriteria SLA yang dipakai pada mode insiden dan mitigasi.
+BATAS_HEADROOM : float
+    Utilisasi (persen) di atas nilai ini membuat verdict paling tinggi Lolos Bersyarat.
+LABEL_SUMBER : dict of str
+    Label tampilan untuk setiap sumber daya pembatas.
+LABEL_VERDICT : dict of str
+    Label tampilan untuk setiap verdict.
+PENYEBAB : dict of str
+    Kalimat kemungkinan penyebab bottleneck per sumber daya pembatas.
 """
 from __future__ import annotations
 
@@ -44,15 +60,78 @@ PENYEBAB = {
 
 
 def iso(dt: datetime) -> str:
+    """Memformat waktu sebagai ISO 8601 UTC dengan milidetik nol.
+
+    Parameters
+    ----------
+    dt : datetime
+        Waktu dengan zona waktu.
+
+    Returns
+    -------
+    str
+        Contoh: ``"2026-11-06T07:00:00.000Z"``.
+    """
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
 def registri_layanan(nama: str) -> dict | None:
+    """Mencari entri layanan pada registri.
+
+    Parameters
+    ----------
+    nama : str
+        Nama layanan, misalnya ``"Layanan Pembayaran"``.
+
+    Returns
+    -------
+    dict or None
+        Entri layanan (model, baseline, spesifikasi), atau ``None`` bila tidak terdaftar.
+    """
     return next((x for x in REGISTRI["layanan"] if x["nama"] == nama), None)
 
 
 @dataclass
 class LangkahAnalisis:
+    """Satu langkah pada rencana analisis beserta hasilnya.
+
+    Attributes
+    ----------
+    urutan : int
+        Nomor urut langkah, mulai dari 1.
+    kunci : str
+        Kunci stabil, misalnya ``"normal"``, ``"puncak"``, ``"whatif-2"``, ``"insiden"``.
+    deskripsi : str
+        Uraian langkah untuk ditampilkan.
+    alat : str
+        Alat agen yang dipakai: ``jalankan_serversim`` atau ``estimasi_serverbrief``.
+    skenario : dict or None
+        SkenarioBeban (TPS dasar, pengali, TPS target, pola beban, durasi).
+    dalamCakupanModel : bool
+        ``False`` bila langkah melibatkan komponen di luar cakupan model digital twin.
+    jalurPenjurusan : {"DigitalTwin", "EstimasiPenalaran", "FallbackDigitalTwin"} or None
+        Jalur yang dipilih saat penjurusan.
+    skorKeyakinan, kesepakatanSampel : float or None
+        Diisi bila langkah melewati EstimatorPenalaran.
+    statusLangkah : {"Menunggu", "Selesai", "Dihentikan"}
+        Status eksekusi langkah.
+    perluVerifikasiManual : bool
+        ``True`` bila angka berasal dari estimasi penalaran.
+    estimasiBiaya : float
+        Estimasi biaya LLM untuk langkah ini.
+    ringkasan : dict or None
+        Indikator hasil langkah.
+    deretWaktu : list of dict
+        Trajektori sumber daya dari digital twin.
+    komponenLatensiMs : dict
+        Rincian latensi per komponen.
+    pelanggaran : list of str
+        Kriteria penerimaan yang dilanggar.
+    status : str or None
+        Verdict per langkah.
+    catatan : str
+        Penjelasan singkat jalur dan hasil.
+    """
     urutan: int
     kunci: str
     deskripsi: str
@@ -73,18 +152,59 @@ class LangkahAnalisis:
     catatan: str = ""
 
     def keluaran(self) -> dict:
+        """Mengubah langkah menjadi dictionary untuk HasilAnalisis.
+
+        Returns
+        -------
+        dict
+            Semua field dataclass.
+        """
         return {k: getattr(self, k) for k in self.__dataclass_fields__}
 
 
 class EstimatorPenalaran:
-    """Menjalankan langkah di luar cakupan model melalui beberapa sampel penalaran LLM."""
+    """Menjalankan langkah di luar cakupan model melalui beberapa sampel penalaran LLM.
+
+    Parameters
+    ----------
+    agen : AgenAnalisis
+        Agen pemilik; dipakai untuk pengaturan, LLM, dan kunci benih.
+
+    Attributes
+    ----------
+    jumlahSampel : int
+        Banyaknya sampel LLM (1 sampai 5).
+    metodeAgregasi : str
+        Cara menggabungkan sampel.
+    """
 
     def __init__(self, agen: "AgenAnalisis"):
+        """Membaca jumlah sampel dari pengaturan agen dan membatasinya ke 1 sampai 5."""
         self.agen = agen
         self.jumlahSampel = max(1, min(int(agen.pengaturan.get("sampel", 3)), 5))
         self.metodeAgregasi = "rata-rata dengan penalti kesepakatan"
 
     def jalankan(self, kunci: str, konteks: str, acuan: dict) -> dict:
+        """Menghasilkan estimasi indikator, skor keyakinan, dan kesepakatan sampel.
+
+        Pada mode LLM, setiap sampel diminta secara terstruktur lalu dirata-rata; kesepakatan dihitung
+        dari sebaran relatif CPU dan p95, dan skor dikurangi 0,1 bila kesepakatan di bawah 0,8.
+        Pada mode demo, estimasi dihitung deterministik dari kunci permintaan.
+
+        Parameters
+        ----------
+        kunci : str
+            Kunci langkah yang diestimasi.
+        konteks : str
+            Konteks tersamarkan untuk prompt LLM.
+        acuan : dict
+            Indikator digital twin tanpa komponen di luar cakupan, sebagai titik awal.
+
+        Returns
+        -------
+        dict
+            ``ringkasan`` (indikator), ``skor`` (0 sampai 1), ``kesepakatan`` (0 sampai 1), dan ``alasan``.
+        """
         if self.agen.mode_llm:
             sampel = []
             for _ in range(self.jumlahSampel):
@@ -96,6 +216,18 @@ class EstimatorPenalaran:
                 return {"ringkasan": acuan, "skor": 0.0, "kesepakatan": 0.0, "alasan": "Seluruh sampel gagal."}
             rata = lambda k: sum(getattr(s, k) for s in sampel) / len(sampel)
             def sebaran(k):
+                """Rata-rata simpangan mutlak relatif antar-sampel untuk satu indikator.
+
+                Parameters
+                ----------
+                k : str
+                    Nama field pada ``EstimasiLLM``.
+
+                Returns
+                -------
+                float
+                    Sebaran relatif; 0 bila rata-ratanya 0.
+                """
                 m = rata(k)
                 return 0 if m == 0 else sum(abs(getattr(s, k) - m) for s in sampel) / len(sampel) / m
             kesepakatan = max(0.0, 1 - (sebaran("cpuPct") + sebaran("p95Ms")) / 2)
@@ -117,7 +249,32 @@ class EstimatorPenalaran:
 
 
 class AgenAnalisis:
+    """Orkestrator satu PermintaanAnalisis dari diterima sampai selesai.
+
+    Parameters
+    ----------
+    permintaan : dict
+        PermintaanAnalisis dari Dashboard: ``idPermintaan``, ``mode`` (``Alignment``,
+        ``ReproduksiInsiden``, atau ``Mitigasi``), ``layanan``, ``parameter`` atau ``insiden``,
+        opsional ``mitigasi``, dan ``pengaturan`` (mode, penyedia, model, harga, ambang, sampel).
+    sekarang : datetime, optional
+        Waktu acuan analisis; bawaan waktu UTC saat ini. Dipakai skrip data contoh agar deterministik.
+
+    Attributes
+    ----------
+    alat : dict of langchain_core.tools.StructuredTool
+        Alat agen: ``kueri_metrik_elk``, ``jalankan_serversim``, ``estimasi_serverbrief``.
+    langkah : list of LangkahAnalisis
+        Langkah analisis yang disusun.
+    jejak : list of dict
+        JejakKeputusan per tahap.
+    peringatan : list of str
+        Peringatan yang ditampilkan pada hasil (misalnya ELK tidak tersedia).
+    status : str
+        Status PermintaanAnalisis saat ini.
+    """
     def __init__(self, permintaan: dict, sekarang: datetime | None = None):
+        """Menyiapkan pengaturan, LayananLLM, penyamar, estimator, dan alat LangChain."""
         self.p = permintaan
         self.mode = permintaan["mode"]  # Alignment | ReproduksiInsiden | Mitigasi
         self.pengaturan = permintaan.get("pengaturan", {})
@@ -149,15 +306,51 @@ class AgenAnalisis:
 
     # ------------------------------------------------------------------ utilitas peristiwa
     def _status(self, s: str):
+        """Mengubah status permintaan dan membuat event status.
+
+        Parameters
+        ----------
+        s : str
+            Status baru pada state machine PermintaanAnalisis.
+
+        Returns
+        -------
+        dict
+            Event ``{"type": "status", "status": s}``.
+        """
         self.status = s
         return {"type": "status", "status": s}
 
     def _jejak(self, id_: str, label: str, jalur: str, catatan: str, t0: float, skor=None, kesepakatan=None):
+        """Menambah satu entri JejakKeputusan.
+
+        Parameters
+        ----------
+        id_ : str
+            Identitas tahap.
+        label : str
+            Label tahap untuk ditampilkan.
+        jalur : str
+            Jalur yang dipakai (``Sistem``, ``LayananLLM``, ``DigitalTwin``, ``EstimasiPenalaran``, dan seterusnya).
+        catatan : str
+            Ringkasan hasil tahap.
+        t0 : float
+            Waktu mulai tahap (``time.time()``) untuk menghitung durasi.
+        skor, kesepakatan : float, optional
+            Skor keyakinan dan kesepakatan sampel bila ada.
+        """
         self.jejak.append({"id": id_, "label": label, "jalur": jalur, "catatan": catatan, "skorKeyakinan": skor,
                            "kesepakatanSampel": kesepakatan, "durasiMs": int((time.time() - t0) * 1000)})
 
     # ------------------------------------------------------------------ alat LangChain
     def _alat_elk(self) -> dict:
+        """Alat ``kueri_metrik_elk``: mengambil baseline Production dari ELK.
+
+        Returns
+        -------
+        dict
+            MetrikBaseline; atribut ``_elk_mati`` diisi bila memakai baseline tersimpan.
+        """
         metrik, mati = ambil_metrik(self.reg or {"baseline": {"avgTps": 5, "peakTps": 35, "cpuPct": 28, "memPct": 55, "p95Ms": 240, "errorRatePct": 0.1}},
                                     self.layanan, self.sekarang, bool(self.pengaturan.get("simulasiElkMati")),
                                     self.pengaturan.get("baselineTersimpan"))
@@ -165,12 +358,36 @@ class AgenAnalisis:
         return metrik
 
     def _alat_serversim(self, kunci: str) -> dict:
+        """Alat ``jalankan_serversim``: menjalankan satu skenario pada digital twin.
+
+        Parameters
+        ----------
+        kunci : str
+            Kunci langkah yang skenarionya disimulasikan.
+
+        Returns
+        -------
+        dict
+            ``ringkasan``, ``deretWaktu``, dan ``komponenLatensiMs``.
+        """
         lk = next(l for l in self.langkah if l.kunci == kunci)
         sk = lk.skenario
         hasil: HasilSimulasi = simulasikan(self.spec, self.profil, sk["tpsTarget"], benih(self.reg["model"]["versiModel"], self.kunci_benih, kunci))
         return {"ringkasan": hasil.ringkasan, "deretWaktu": hasil.deretWaktu, "komponenLatensiMs": hasil.komponenLatensiMs}
 
     def _alat_estimasi(self, kunci: str) -> dict:
+        """Alat ``estimasi_serverbrief``: estimasi penalaran untuk langkah di luar cakupan model.
+
+        Parameters
+        ----------
+        kunci : str
+            Kunci langkah yang diestimasi.
+
+        Returns
+        -------
+        dict
+            Keluaran ``EstimatorPenalaran.jalankan``.
+        """
         lk = next(l for l in self.langkah if l.kunci == kunci)
         acuan = self._acuan_estimasi()
         konteks = (
@@ -182,6 +399,20 @@ class AgenAnalisis:
 
     # ------------------------------------------------------------------ alur utama
     def proses(self) -> Generator[dict, None, None]:
+        """Menjalankan seluruh alur analisis sambil mengalirkan event kemajuan.
+
+        Yields
+        ------
+        dict
+            Event ``{"type": "status"}`` setiap perubahan status, ``{"type": "step"}`` dengan
+            ``state`` ``run``, ``done``, ``warn``, atau ``skip`` untuk setiap tahap, dan terakhir
+            ``{"type": "hasil", "hasil": dict}`` berisi HasilAnalisis lengkap.
+
+        Notes
+        -----
+        Bila model tidak aktif atau beban suatu langkah di luar rentang TPS terkalibrasi, langkah
+        ditandai Dihentikan, indikator tidak dihitung, dan verdict menjadi Tidak Dapat Dinilai.
+        """
         t_mulai = time.time()
         yield self._status("Diterima")
 
@@ -292,6 +523,12 @@ class AgenAnalisis:
 
     # ------------------------------------------------------------------ langkah internal
     def _samarkan(self):
+        """Menyusun konteks analisis yang sudah disamarkan untuk dikirim ke Layanan LLM.
+
+        Nama layanan diganti alias, sedangkan teks bebas (perubahan konfigurasi, catatan uji,
+        deskripsi dan gejala insiden) disamarkan dengan ``Penyamar.teks``. Hasilnya disimpan di
+        ``self.konteks``.
+        """
         s = self.penyamar
         alias = s.layanan(self.layanan)
         if self.mode == "Alignment":
@@ -316,6 +553,13 @@ class AgenAnalisis:
             )
 
     def _metrik_periode_insiden(self):
+        """Menyiapkan metrik periode insiden untuk mode insiden dan mitigasi.
+
+        Returns
+        -------
+        dict or None
+            Metrik periode insiden dari ELK atau gejala manual; ``None`` pada mode Alignment.
+        """
         if self.mode == "Alignment":
             return None
         ins = self.p["insiden"]
@@ -325,6 +569,12 @@ class AgenAnalisis:
                 "durasiMenit": ins["durationMin"], "waktuDeteksi": ins.get("detectedAt")}
 
     def _susun_langkah(self):
+        """Menyusun daftar ``LangkahAnalisis`` sesuai mode.
+
+        Mode Alignment membuat langkah beban normal, puncak, dan setiap varian what-if (pengali
+        beban normal), ditambah langkah estimasi bila perubahan konfigurasi menyebut komponen di
+        luar cakupan model. Mode insiden dan mitigasi membuat satu langkah profil beban insiden.
+        """
         self.langkah = []
         cakupan = [k.lower() for k in (self.reg["model"]["cakupanKomponen"] if self.reg else [])]
         if self.mode == "Alignment":
@@ -356,6 +606,14 @@ class AgenAnalisis:
                                                     "durasiMenit": ins["durationMin"], "campuranTransaksi": "sesuai periode insiden"}))
 
     def _susun_rencana(self) -> dict:
+        """Menyusun RencanaAnalisis, diperkaya LLM bila mode LLM aktif.
+
+        Returns
+        -------
+        dict
+            ``ringkasanTujuan``, ``waktuDisusun``, dan daftar ``langkah``. Bila LLM gagal, rencana
+            deterministik tetap dipakai dan peringatan dicatat.
+        """
         tujuan = ("Menilai kesiapan versi uji pada beban normal, puncak, dan varian what-if terhadap kriteria penerimaan."
                   if self.mode == "Alignment" else
                   "Mereproduksi kondisi insiden pada spesifikasi saat ini." if self.mode == "ReproduksiInsiden" else
@@ -383,6 +641,17 @@ class AgenAnalisis:
         return rencana
 
     def _kalibrasi(self) -> str:
+        """Mengkalibrasi profil beban dan menetapkan spesifikasi target serta kriteria.
+
+        Mode Alignment memakai hasil uji Dev pada spesifikasi Dev; mode insiden memakai baseline
+        Production. Kebocoran memori dan porsi batch job ditambahkan sesuai tipe insiden, dan
+        perubahan mitigasi diterapkan ke spesifikasi.
+
+        Returns
+        -------
+        str
+            Catatan kalibrasi untuk jejak keputusan.
+        """
         porsi = self.reg.get("porsiDatabase", 0.6)
         seed = benih(self.reg["model"]["versiModel"], "kalibrasi", self.kunci_benih)
         if self.mode == "Alignment":
@@ -418,6 +687,14 @@ class AgenAnalisis:
                 f"(galat {self.info_kalibrasi['galatPersen']}%).")
 
     def _acuan_estimasi(self) -> dict:
+        """Indikator acuan untuk estimasi penalaran.
+
+        Returns
+        -------
+        dict
+            Ringkasan langkah puncak atau insiden bila sudah ada; bila belum, hasil simulasi baru
+            pada TPS target langkah pertama.
+        """
         puncak = next((l for l in self.langkah if l.kunci in ("puncak", "insiden") and l.ringkasan), None)
         if puncak:
             return dict(puncak.ringkasan)
@@ -426,7 +703,21 @@ class AgenAnalisis:
         return h.ringkasan
 
     def _jurus_langkah(self, lk: LangkahAnalisis) -> str:
-        """Penjurusan (Gambar 10.3): dalam cakupan atau skor di bawah ambang -> digital twin; skor memenuhi ambang -> estimasi."""
+        """Penjurusan satu langkah (Gambar 10.3) lalu menjalankannya.
+
+        Langkah dalam cakupan model memakai digital twin. Langkah di luar cakupan memakai estimasi
+        penalaran bila skor keyakinan memenuhi ambang, atau kembali ke digital twin (fallback) bila tidak.
+
+        Parameters
+        ----------
+        lk : LangkahAnalisis
+            Langkah yang dijalankan; field hasilnya diisi di tempat.
+
+        Returns
+        -------
+        {"done", "warn"}
+            Status event untuk ditampilkan; ``warn`` bila angka perlu verifikasi manual.
+        """
         if lk.dalamCakupanModel:
             out = self.alat["jalankan_serversim"].invoke({"kunci": lk.kunci})
             lk.jalurPenjurusan = "DigitalTwin"
@@ -460,6 +751,18 @@ class AgenAnalisis:
         return state
 
     def _pelanggaran(self, r: dict) -> list[str]:
+        """Membandingkan indikator dengan kriteria penerimaan.
+
+        Parameters
+        ----------
+        r : dict
+            Ringkasan indikator satu langkah.
+
+        Returns
+        -------
+        list of str
+            Uraian setiap kriteria yang dilanggar, termasuk thread pool jenuh (>= 95%).
+        """
         k = self.kriteria
         v = []
         if r["p95Ms"] > k["maxP95Ms"]:
@@ -475,9 +778,34 @@ class AgenAnalisis:
         return v
 
     def _util_maks(self, r: dict) -> float:
+        """Utilisasi tertinggi di antara CPU, memori, jaringan, thread pool, dan connection pool.
+
+        Parameters
+        ----------
+        r : dict
+            Ringkasan indikator.
+
+        Returns
+        -------
+        float
+            Utilisasi tertinggi dalam persen.
+        """
         return max(r["cpuPct"], r["memPct"], r.get("netPct", 0), r.get("threadPct", 0), r.get("connPct", 0))
 
     def _status_skenario(self, lk: LangkahAnalisis) -> str:
+        """Verdict untuk satu langkah.
+
+        Parameters
+        ----------
+        lk : LangkahAnalisis
+            Langkah yang sudah memiliki ringkasan dan daftar pelanggaran.
+
+        Returns
+        -------
+        {"Lolos", "LolosBersyarat", "TidakLolos"}
+            ``TidakLolos`` bila ada pelanggaran; ``LolosBersyarat`` bila memakai estimasi atau
+            headroom di atas ``BATAS_HEADROOM``; selain itu ``Lolos``.
+        """
         if lk.pelanggaran:
             return "TidakLolos"
         if lk.jalurPenjurusan == "EstimasiPenalaran" or self._util_maks(lk.ringkasan) > BATAS_HEADROOM:
@@ -485,12 +813,27 @@ class AgenAnalisis:
         return "Lolos"
 
     def _langkah_utama(self) -> LangkahAnalisis | None:
+        """Langkah yang menjadi dasar indikator dan verdict.
+
+        Returns
+        -------
+        LangkahAnalisis or None
+            Langkah estimasi dampak komponen bila memakai estimasi penalaran; bila tidak, langkah
+            beban puncak atau langkah insiden.
+        """
         est = next((l for l in self.langkah if l.kunci == "dampak-komponen" and l.jalurPenjurusan == "EstimasiPenalaran"), None)
         if est:
             return est
         return next((l for l in self.langkah if l.kunci in ("puncak", "insiden") and l.ringkasan), None)
 
     def _hitung_indikator(self):
+        """Menghitung IndikatorSumberDaya, kapasitas, sumber daya pembatas, dan penyebab.
+
+        Pembatas ditentukan dari sumber daya yang mendekati jenuh (>= 60%); bila tidak ada,
+        latensi yang mendominasi saat p95 dilanggar (database atau dependensi eksternal); selain itu
+        sumber daya yang paling dulu habis menurut capacity planning Little's Law. Pada mode insiden,
+        status reproduksi dan kemungkinan akar masalah juga diisi.
+        """
         self.indikator, self.kapasitas, self.pembatas, self.penyebab = [], None, None, []
         self.status_reproduksi = None
         self.akar_masalah = []
@@ -506,6 +849,32 @@ class AgenAnalisis:
         self.kapasitas = kapasitas_littles_law(self.spec, self.profil, hs, twin_puncak.skenario["tpsTarget"], self.kriteria["maxCpuPct"])
         sp = self.spec
         def ind(jenis, label, nilai, satuan, kap, rasio=None, src=sumber, v=verif):
+            """Membuat satu entri IndikatorSumberDaya.
+
+            Parameters
+            ----------
+            jenis : str
+                Jenis indikator, misalnya ``"CPU"``.
+            label : str
+                Label tampilan.
+            nilai : float
+                Nilai indikator.
+            satuan : str
+                Satuan nilai.
+            kap : str
+                Uraian kapasitas spesifikasi.
+            rasio : float, optional
+                Rasio utilisasi 0 sampai 1.
+            src : str, optional
+                Sumber angka (jalur penjurusan).
+            v : bool, optional
+                Apakah angka perlu verifikasi manual.
+
+            Returns
+            -------
+            dict
+                Entri indikator.
+            """
             return {"jenis": jenis, "label": label, "nilai": nilai, "satuan": satuan, "kapasitasSpesifikasi": kap,
                     "rasioUtilisasi": rasio, "sumberAngka": src, "perluVerifikasiManual": v}
         self.indikator = [
@@ -556,6 +925,13 @@ class AgenAnalisis:
                                      f"{'%' if pembatas in util else ' ms'}).")
 
     def _tetapkan_verdict(self):
+        """Menetapkan verdict beserta alasan dan syarat.
+
+        Aturan: Tidak Dapat Dinilai bila analisis dihentikan; Tidak Lolos bila langkah wajib
+        (normal, puncak, insiden) melanggar kriteria; Lolos Bersyarat bila ada estimasi penalaran
+        atau headroom tipis; selain itu Lolos. Hasil varian what-if dicantumkan sebagai alasan
+        tanpa memengaruhi verdict utama.
+        """
         alasan, syarat = [], []
         if self.dihentikan:
             status = "TidakDapatDinilai"
@@ -599,6 +975,14 @@ class AgenAnalisis:
         self.verdict = {"status": status, "alasan": alasan, "syarat": syarat, "narasi": "", "waktuDitetapkan": iso(datetime.now(timezone.utc))}
 
     def _narasi_templat(self) -> str:
+        """Narasi verdict deterministik.
+
+        Returns
+        -------
+        str
+            Tiga sampai lima kalimat tentang cara verdict diperoleh, sumber daya pembatas,
+            kapasitas maksimum, dan kemungkinan penyebab bottleneck.
+        """
         v = self.verdict
         if self.dihentikan:
             return (f"Status {LABEL_VERDICT[v['status']]} ditetapkan karena analisis tidak dapat dijalankan secara sah: {self.dihentikan} "
@@ -625,6 +1009,11 @@ class AgenAnalisis:
         return " ".join(bagian)
 
     def _minta_narasi(self):
+        """Mengisi narasi verdict dari Layanan LLM, dengan templat sebagai cadangan.
+
+        Narasi templat selalu disiapkan lebih dulu; pada mode LLM narasi diganti jawaban model bila
+        berhasil. ``self._narasi_fallback`` menandai apakah templat yang dipakai.
+        """
         self._narasi_fallback = True
         templat = self._narasi_templat()
         self.verdict["narasi"] = templat
@@ -645,6 +1034,14 @@ class AgenAnalisis:
             self.peringatan.append(f"Layanan LLM gagal menyusun narasi ({e}); memakai templat.")
 
     def _rencana_uji(self) -> list[dict]:
+        """Menyusun rencana uji performa lanjutan di lower environment.
+
+        Returns
+        -------
+        list of dict
+            Langkah uji bernomor dengan ``nama``, ``profilBeban``, ``durasiMenit``,
+            ``kriteriaLulus``, dan ``alasan``.
+        """
         if self.dihentikan:
             return [{"urutan": 1, "nama": "Kalibrasi ulang model", "profilBeban": "Injeksi latensi dan tekanan CPU terkendali di lower environment",
                      "durasiMenit": 120, "kriteriaLulus": "Galat p95 simulasi terhadap terukur di bawah 10%", "alasan": self.dihentikan}]
@@ -683,6 +1080,21 @@ class AgenAnalisis:
         return uji
 
     def _hasil(self, t_mulai: float, biaya: dict) -> dict:
+        """Merangkai HasilAnalisis lengkap untuk dikirim ke Dashboard.
+
+        Parameters
+        ----------
+        t_mulai : float
+            Waktu mulai proses (``time.time()``).
+        biaya : dict
+            Ringkasan biaya dari ``LayananLLM.biaya``.
+
+        Returns
+        -------
+        dict
+            HasilAnalisis: status permintaan, metrik, model dan kalibrasi, rencana, langkah,
+            indikator, kapasitas, pembatas, verdict, rencana uji, jejak keputusan, dan peringatan.
+        """
         model = self.reg["model"] if self.reg else None
         selesai = datetime.now(timezone.utc)
         return {
@@ -731,7 +1143,22 @@ class AgenAnalisis:
 
 
 def jalankan_lengkap(permintaan: dict, sekarang: datetime | None = None) -> dict:
-    """Menjalankan agen sampai selesai dan mengembalikan HasilAnalisis (dipakai skrip data contoh)."""
+    """Menjalankan agen sampai selesai tanpa streaming.
+
+    Dipakai skrip pembuat data contoh.
+
+    Parameters
+    ----------
+    permintaan : dict
+        PermintaanAnalisis.
+    sekarang : datetime, optional
+        Waktu acuan analisis.
+
+    Returns
+    -------
+    dict
+        HasilAnalisis.
+    """
     hasil = None
     for ev in AgenAnalisis(permintaan, sekarang).proses():
         if ev["type"] == "hasil":

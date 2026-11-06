@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * Server action UC-02 Tangani Respons Insiden: membuka kasus, menandai perlu eskalasi, dan
+ * menyusun laporan insiden (state machine Gambar 10.18).
+ */
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
@@ -17,12 +21,40 @@ export interface IncFormState {
 
 const TYPES: IncidentType[] = ["traffic_spike", "memory_leak", "batch_overlap", "lainnya"];
 
+/**
+ * Nilai formulir yang dikirim, dikembalikan saat validasi gagal.
+ *
+ * Parameters
+ * ----------
+ * f : FormData
+ *     Data formulir.
+ *
+ * Returns
+ * -------
+ * Record<string, string>
+ */
 function echo(f: FormData) {
   const out: Record<string, string> = {};
   for (const [k, v] of f.entries()) if (!k.startsWith("$")) out[k] = String(v);
   return out;
 }
 
+/**
+ * Membuka kasus insiden baru berstatus Dicatat (Integration Engineer atau Technical Lead).
+ *
+ * Parameters
+ * ----------
+ * _ : IncFormState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     Tipe, layanan, rilis, ringkasan, deskripsi, beban, durasi, waktu deteksi, spesifikasi,
+ *     ketersediaan data ELK, dan field khusus tipe (kenaikan memori, beban batch).
+ *
+ * Returns
+ * -------
+ * Promise<IncFormState>
+ *     Galat validasi; bila berhasil, dialihkan ke halaman insiden.
+ */
 export async function createIncident(_: IncFormState, f: FormData): Promise<IncFormState> {
   const user = await requirePermission("incident.manage");
   const errors: Record<string, string> = {};
@@ -97,7 +129,18 @@ export async function createIncident(_: IncFormState, f: FormData): Promise<IncF
   redirect(`/incidents/${inc.id}`);
 }
 
-/** tutupPengujianOpsi() [tidak ada opsi Lolos] / tandaiPerluEskalasi(): Uji Mitigasi -> Perlu Eskalasi. */
+/**
+ * Menutup pengujian opsi tanpa verdict Lolos: Uji Mitigasi -> Perlu Eskalasi.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas insiden.
+ *
+ * Returns
+ * -------
+ * Promise<void>
+ */
 export async function markAllTested(id: string) {
   const user = await requirePermission("incident.manage");
   const inc = await getIncident(id);
@@ -110,7 +153,23 @@ export async function markAllTested(id: string) {
   revalidatePath("/", "layout");
 }
 
-/** pilihMitigasi(opsi) / susunLaporan(): Mitigasi Ditemukan, Perlu Eskalasi, atau Belum Tereproduksi -> Terdokumentasi. */
+/**
+ * Menyusun laporan insiden: Mitigasi Ditemukan, Perlu Eskalasi, atau Belum Tereproduksi -> Terdokumentasi.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas insiden (diikat dengan bind).
+ * _ : IncFormState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     "mitigation": opsi yang direkomendasikan (tidak dibutuhkan bila belum tereproduksi).
+ *
+ * Returns
+ * -------
+ * Promise<IncFormState>
+ *     Galat; bila berhasil, dialihkan ke halaman insiden dengan penanda laporan.
+ */
 export async function finalizeIncident(id: string, _: IncFormState, f: FormData): Promise<IncFormState> {
   const user = await requirePermission("incident.manage");
   const inc = await getIncident(id);

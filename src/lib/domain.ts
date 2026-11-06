@@ -1,3 +1,7 @@
+/**
+ * Logika domain bersama: transisi state machine, parameter bawaan, ringkasan hasil, dan
+ * pembentukan entri laporan dari sesi, sign-off, dan insiden.
+ */
 import type {
   AlignmentParams,
   AlignmentSession,
@@ -12,7 +16,22 @@ import type {
 } from "./types";
 import { serviceEntry } from "./services";
 
-/** Transisi state machine: mengubah status dan mencatat riwayatnya (event, waktu, pelaku). */
+/**
+ * Transisi state machine: mengubah status dan mencatat riwayatnya (Bab 10).
+ *
+ * Parameters
+ * ----------
+ * obj : { status: S; history: StatusEvent<S>[] }
+ *     Sesi alignment, kasus insiden, atau dokumen sign-off; diubah di tempat.
+ * status : S
+ *     Status tujuan.
+ * by : string
+ *     Pelaku transisi (nama peran atau "Sistem").
+ * note : string, optional
+ *     Event pemicu atau catatan.
+ * at : string, default waktu sekarang
+ *     Waktu transisi dalam ISO 8601.
+ */
 export function transition<S extends SessionStatus | IncidentStatus | SignoffStatus>(
   obj: { status: S; history: StatusEvent<S>[] },
   status: S,
@@ -24,6 +43,20 @@ export function transition<S extends SessionStatus | IncidentStatus | SignoffSta
   obj.history = [...(obj.history ?? []), { status, at, by, ...(note ? { note } : {}) }];
 }
 
+/**
+ * Parameter analisis bawaan untuk sesi alignment baru.
+ *
+ * Parameters
+ * ----------
+ * service : string
+ *     Nama layanan; spesifikasi Production diambil dari registri bila terdaftar.
+ *
+ * Returns
+ * -------
+ * AlignmentParams
+ *     Beban normal 8 TPS, puncak 45 TPS, what-if 2x dan 3x normal, kriteria penerimaan
+ *     bawaan, serta spesifikasi Dev dan Production.
+ */
 export function defaultParams(service: string): AlignmentParams {
   const spec = serviceEntry(service)?.spesifikasi ?? { vcpu: 8, ramGb: 16, nodes: 2, threadPool: 150, connPool: 40, bandwidthMbps: 1000, timeoutMs: 3000 };
   return {
@@ -39,13 +72,52 @@ export function defaultParams(service: string): AlignmentParams {
   };
 }
 
+/**
+ * Hasil analisis terbaru sebuah sesi.
+ *
+ * Parameters
+ * ----------
+ * s : AlignmentSession
+ *     Sesi alignment.
+ *
+ * Returns
+ * -------
+ * AnalysisResult | undefined
+ *     Hasil permintaan analisis terakhir, atau undefined bila belum pernah dianalisis.
+ */
 export const latestResult = (s: AlignmentSession) => s.runs.at(-1)?.result;
 
-/** Indikator langkah beban puncak (atau langkah insiden) dari hasil Core Module. */
+/**
+ * Ringkasan indikator pada langkah beban puncak (atau langkah insiden).
+ *
+ * Parameters
+ * ----------
+ * r : AnalysisResult | undefined | null
+ *     Hasil Core Module.
+ *
+ * Returns
+ * -------
+ * StepSummary | null
+ *     Ringkasan indikator, atau null bila tidak tersedia.
+ */
 export function peakSummary(r: AnalysisResult | undefined | null) {
   return r?.langkah.find((l) => l.kunci === "puncak" || l.kunci === "insiden")?.ringkasan ?? null;
 }
 
+/**
+ * Daftar keterbatasan simulasi untuk dicantumkan pada dokumen sign-off.
+ *
+ * Parameters
+ * ----------
+ * r : AnalysisResult
+ *     Hasil Core Module.
+ *
+ * Returns
+ * -------
+ * string[]
+ *     Kalimat keterbatasan: posisi simulasi terhadap SIT/UAT, versi dan tanggal kalibrasi
+ *     model, sumber baseline, jumlah data yang disamarkan, dan galat kalibrasi.
+ */
 export function limitationsFor(r: AnalysisResult): string[] {
   const m = r.modelDigitalTwin;
   const tgl = (s: string) => new Date(s).toLocaleDateString("id-ID", { dateStyle: "long" });
@@ -63,6 +135,19 @@ export function limitationsFor(r: AnalysisResult): string[] {
   return out;
 }
 
+/**
+ * Membentuk entri riwayat laporan dari sesi alignment yang sudah diputuskan.
+ *
+ * Parameters
+ * ----------
+ * s : AlignmentSession
+ *     Sesi dengan minimal satu hasil analisis.
+ *
+ * Returns
+ * -------
+ * ReportEntry
+ *     Entri laporan berjenis "alignment".
+ */
 export function reportFromSession(s: AlignmentSession): ReportEntry {
   const r = latestResult(s)!;
   const peak = peakSummary(r);
@@ -82,6 +167,19 @@ export function reportFromSession(s: AlignmentSession): ReportEntry {
   };
 }
 
+/**
+ * Membentuk entri riwayat laporan dari dokumen sign-off.
+ *
+ * Parameters
+ * ----------
+ * d : SignoffDoc
+ *     Dokumen sign-off.
+ *
+ * Returns
+ * -------
+ * ReportEntry
+ *     Entri laporan berjenis "signoff".
+ */
 export function reportFromSignoff(d: SignoffDoc): ReportEntry {
   const r = d.snapshot.result;
   const peak = peakSummary(r);
@@ -101,15 +199,56 @@ export function reportFromSignoff(d: SignoffDoc): ReportEntry {
   };
 }
 
+/**
+ * Waktu dari deteksi insiden sampai akar masalah teridentifikasi (data MTTR).
+ *
+ * Parameters
+ * ----------
+ * inc : Incident
+ *     Kasus insiden.
+ *
+ * Returns
+ * -------
+ * number | undefined
+ *     Durasi dalam menit (minimal 1), atau undefined bila akar masalah belum teridentifikasi.
+ */
 export function mttrMinutes(inc: Incident): number | undefined {
   if (!inc.rootCauseAt) return undefined;
   return Math.max(1, Math.round((new Date(inc.rootCauseAt).getTime() - new Date(inc.data.detectedAt).getTime()) / 60000));
 }
 
+/**
+ * Opsi mitigasi yang dipilih sebagai rekomendasi.
+ *
+ * Parameters
+ * ----------
+ * inc : Incident
+ *     Kasus insiden.
+ *
+ * Returns
+ * -------
+ * Mitigation | undefined
+ *     Opsi terpilih, atau undefined bila belum dipilih.
+ */
 export function selectedMitigation(inc: Incident) {
   return inc.mitigations.find((m) => m.id === inc.selectedMitigationId);
 }
 
+/**
+ * Membentuk entri riwayat laporan dari kasus insiden yang terdokumentasi.
+ *
+ * Insiden tanpa data ELK ditandai terbatas NDA sehingga unduhan hanya memuat data agregat.
+ *
+ * Parameters
+ * ----------
+ * inc : Incident
+ *     Kasus insiden.
+ *
+ * Returns
+ * -------
+ * ReportEntry
+ *     Entri laporan berjenis "insiden".
+ */
 export function reportFromIncident(inc: Incident): ReportEntry {
   const after = selectedMitigation(inc)?.result;
   const peak = peakSummary(inc.repro);

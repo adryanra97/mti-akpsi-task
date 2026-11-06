@@ -1,3 +1,6 @@
+/**
+ * Papan promosi bergaya papan keberangkatan: jadwal, rilis, layanan, cycle, dan status promosi.
+ */
 import Link from "next/link";
 import { cx } from "./ui";
 
@@ -34,12 +37,35 @@ const SHAPE: Record<BoardTone, string> = {
 };
 
 /**
- * Papan promosi: setiap release candidate ditampilkan seperti jadwal keberangkatan menuju Production.
- * Tetap berupa tabel agar terbaca pembaca layar; status selalu disertai label teks.
+ * Nama rilis tanpa awalan "Rilis".
+ *
+ * Parameters
+ * ----------
+ * release : string
+ *     Nama rilis.
+ *
+ * Returns
+ * -------
+ * string
  */
-/** Kolom sudah berjudul "Rilis", jadi awalan "Rilis" tidak diulang di sel papan. */
 const short = (release: string) => release.replace(/^rilis\s+/i, "");
 
+/**
+ * Papan promosi Dev ke Production dengan animasi flap per baris.
+ *
+ * Parameters
+ * ----------
+ * rows : BoardRow[]
+ *     Baris papan; baris dengan href dapat diklik.
+ * caption : string
+ *     Keterangan tabel untuk pembaca layar.
+ * animate : boolean, default true
+ *     Aktifkan animasi flap (dinonaktifkan otomatis bila pengguna memilih gerak dikurangi).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function DepartureBoard({ rows, caption, animate = true }: { rows: BoardRow[]; caption: string; animate?: boolean }) {
   return (
     <div className="overflow-x-auto rounded-[10px] bg-board text-board-ink ring-1 ring-board-line">

@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Grafik ringkasan tren laporan (recharts): CPU puncak per cycle dan jumlah insiden per rilis.
+ */
 import { Bar, BarChart, CartesianGrid, LabelList, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export interface CpuSeries {
@@ -10,6 +13,26 @@ export interface CpuSeries {
 
 const SERIES = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
 
+/**
+ * Tooltip grafik tren.
+ *
+ * Parameters
+ * ----------
+ * active : boolean, optional
+ *     Tooltip sedang aktif.
+ * payload : { name: string; value: number; color: string }[], optional
+ *     Nilai seri.
+ * label : string | number, optional
+ *     Label sumbu X.
+ * unit : string
+ *     Satuan nilai.
+ * prefix : string, optional
+ *     Awalan label, misalnya "Cycle".
+ *
+ * Returns
+ * -------
+ * JSX.Element | null
+ */
 function Tip({ active, payload, label, unit, prefix }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string | number; unit: string; prefix: string }) {
   if (!active || !payload?.length) return null;
   return (
@@ -30,6 +53,18 @@ function Tip({ active, payload, label, unit, prefix }: { active?: boolean; paylo
   );
 }
 
+/**
+ * Grafik garis CPU saat beban puncak per cycle untuk maksimal tiga rilis.
+ *
+ * Parameters
+ * ----------
+ * series : CpuSeries[]
+ *     Deret per rilis.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function CpuTrend({ series }: { series: CpuSeries[] }) {
   const shown = series.slice(0, 3);
   const cycles = Array.from(new Set(shown.flatMap((s) => s.points.map((p) => p.cycle)))).sort((a, b) => a - b);
@@ -92,6 +127,18 @@ export function CpuTrend({ series }: { series: CpuSeries[] }) {
   );
 }
 
+/**
+ * Grafik batang jumlah insiden per rilis.
+ *
+ * Parameters
+ * ----------
+ * data : { release: string; count: number }[]
+ *     Jumlah insiden per rilis.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function IncidentBars({ data }: { data: { release: string; count: number }[] }) {
   return (
     <div className="h-[220px]" role="img" aria-label="Grafik jumlah insiden per rilis">

@@ -1,3 +1,6 @@
+/**
+ * Halaman daftar sesi alignment, dikelompokkan per rilis.
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -14,6 +17,18 @@ import type { AlignmentSession } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Alignment rilis" };
 
+/**
+ * Warna tag untuk status sesi.
+ *
+ * Parameters
+ * ----------
+ * s : AlignmentSession
+ *     Sesi alignment.
+ *
+ * Returns
+ * -------
+ * "neutral" | "accent" | "warn" | "pass" | "fail"
+ */
 function statusTone(s: AlignmentSession) {
   if (s.status === "Diputuskan" || s.status === "Ditutup") return s.decision === "LanjutPromosi" ? "pass" : "neutral";
   if (s.status === "Peninjauan") return "accent";
@@ -21,6 +36,13 @@ function statusTone(s: AlignmentSession) {
   return "warn";
 }
 
+/**
+ * Halaman daftar sesi alignment.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function AlignmentList() {
   const user = await requireUser();
   const sessions = sortSessions(await listSessions());

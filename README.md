@@ -143,6 +143,13 @@ Di mode pengembangan lokal tanpa `.env.local`, kata sandi pengujian adalah `dev-
 
 Aksesibel: kontras warna sesuai WCAG AA, fokus keyboard terlihat, teks alternatif untuk status, mode gelap, dan tata letak responsif sampai lebar ponsel.
 
+## Konvensi dokumentasi kode
+
+Setiap modul, kelas, dan fungsi memiliki docstring bergaya **NumPy** (bagian `Parameters`, `Returns`, `Yields`, `Raises`, `Attributes`, `Notes`):
+
+- Python (`api/`, `scripts/`): docstring biasa (`"""..."""`), bisa dibaca dengan `help()`.
+- TypeScript (`src/`): format yang sama di dalam blok JSDoc `/** ... */`, sehingga tampil saat hover di editor.
+
 ## Struktur
 
 ```

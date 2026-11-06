@@ -1,3 +1,6 @@
+/**
+ * Beranda: tugas yang menunggu peran pengguna, papan promosi Dev ke Production, dan insiden terbuka.
+ */
 import Link from "next/link";
 import { CalendarClock, ChevronRight, FileSignature, ShieldAlert, Siren } from "lucide-react";
 import { requireUser } from "@/lib/auth";
@@ -25,6 +28,21 @@ const VERDICT_BOARD: Record<Verdict, [string, BoardTone]> = {
   TidakDapatDinilai: ["Tidak dapat dinilai", "na"],
 };
 
+/**
+ * Status dan warna baris papan promosi untuk sebuah sesi.
+ *
+ * Parameters
+ * ----------
+ * s : AlignmentSession
+ *     Sesi alignment.
+ * signoffs : SignoffDoc[]
+ *     Seluruh dokumen sign-off, untuk status setelah lanjut promosi.
+ *
+ * Returns
+ * -------
+ * [string, BoardTone]
+ *     Label status dan nada warna.
+ */
 function boardStatus(s: AlignmentSession, signoffs: SignoffDoc[]): [string, BoardTone] {
   if (s.status === "Terjadwal") return ["Terjadwal", "wait"];
   if (s.status === "PengisianParameter") return [s.params ? "Siap diajukan" : "Pengisian parameter", "wait"];
@@ -37,8 +55,34 @@ function boardStatus(s: AlignmentSession, signoffs: SignoffDoc[]): [string, Boar
   return ["Disetujui", "pass"];
 }
 
+/**
+ * Memformat tanggal pada zona WIB dengan opsi tertentu.
+ *
+ * Parameters
+ * ----------
+ * iso : string
+ *     Tanggal ISO 8601.
+ * opt : Intl.DateTimeFormatOptions
+ *     Opsi format.
+ *
+ * Returns
+ * -------
+ * string
+ */
 const wib = (iso: string, opt: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleString("id-ID", { ...opt, timeZone: "Asia/Jakarta" });
 
+/**
+ * Halaman beranda.
+ *
+ * Parameters
+ * ----------
+ * searchParams : Promise<{ akses?: string }>
+ *     "akses" terisi bila pengguna dialihkan dari halaman di luar aksesnya.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function Home({ searchParams }: { searchParams: Promise<{ akses?: string }> }) {
   const user = await requireUser();
   const { akses } = await searchParams;

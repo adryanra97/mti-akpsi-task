@@ -1,3 +1,6 @@
+/**
+ * Halaman detail kasus insiden: data, reproduksi, opsi mitigasi, dan laporan insiden.
+ */
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CircleCheck, Info, ShieldAlert } from "lucide-react";
@@ -15,6 +18,18 @@ import { fmtDate, fmtNum } from "@/lib/format";
 import { INCIDENT_STATUS_LABEL, LIMITING_LABEL, VERDICT_LABEL } from "@/lib/verdict";
 import type { AnalysisStep, Incident, IncidentStatus, Spec } from "@/lib/types";
 
+/**
+ * Judul tab browser untuk kasus insiden.
+ *
+ * Parameters
+ * ----------
+ * params : Promise<{ id: string }>
+ *     Parameter rute.
+ *
+ * Returns
+ * -------
+ * Promise<Metadata>
+ */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const i = await getIncident((await params).id);
   return { title: i ? i.code : "Insiden" };
@@ -22,10 +37,36 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 const STATES: IncidentStatus[] = ["Dicatat", "DalamReproduksi", "Tereproduksi", "BelumTereproduksi", "UjiMitigasi", "MitigasiDitemukan", "PerluEskalasi", "Terdokumentasi"];
 
+/**
+ * Spesifikasi setelah perubahan opsi mitigasi diterapkan.
+ *
+ * Parameters
+ * ----------
+ * spec : Spec
+ *     Spesifikasi saat ini.
+ * ch : Partial<Spec>
+ *     Perubahan; nilai kosong diabaikan.
+ *
+ * Returns
+ * -------
+ * Spec
+ */
 function applied(spec: Spec, ch: Partial<Spec>): Spec {
   return { ...spec, ...Object.fromEntries(Object.entries(ch).filter(([, v]) => v)) };
 }
 
+/**
+ * Ringkasan teks laporan insiden untuk disalin ke kanal eskalasi.
+ *
+ * Parameters
+ * ----------
+ * inc : Incident
+ *     Kasus insiden.
+ *
+ * Returns
+ * -------
+ * string
+ */
 function summaryText(inc: Incident) {
   const chosen = selectedMitigation(inc);
   const lines = [
@@ -43,6 +84,20 @@ function summaryText(inc: Incident) {
   return lines.filter(Boolean).join("\n");
 }
 
+/**
+ * Halaman detail kasus insiden.
+ *
+ * Parameters
+ * ----------
+ * params : Promise<{ id: string }>
+ *     Identitas insiden.
+ * searchParams : Promise<{ laporan?: string }>
+ *     "laporan" terisi setelah laporan insiden tersimpan.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function IncidentPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ laporan?: string }> }) {
   const user = await requireUser();
   const { id } = await params;

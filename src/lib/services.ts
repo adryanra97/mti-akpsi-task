@@ -1,3 +1,9 @@
+/**
+ * Registri layanan dan ModelDigitalTwin untuk Dashboard.
+ *
+ * Dibaca dari `api/_core/registry.json`, berkas yang sama dengan Core Module Python, agar
+ * spesifikasi dan rentang kalibrasi selalu sinkron.
+ */
 import registry from "../../api/_core/registry.json";
 import type { DigitalTwinModel, Spec } from "./types";
 
@@ -11,6 +17,19 @@ export interface ServiceEntry {
 
 export const SERVICES: ServiceEntry[] = registry.layanan as ServiceEntry[];
 
+/**
+ * Mencari entri layanan pada registri.
+ *
+ * Parameters
+ * ----------
+ * name : string
+ *     Nama layanan.
+ *
+ * Returns
+ * -------
+ * ServiceEntry | undefined
+ *     Entri layanan, atau undefined bila tidak terdaftar.
+ */
 export function serviceEntry(name: string) {
   return SERVICES.find((s) => s.nama === name);
 }

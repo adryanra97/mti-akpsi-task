@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * Server action UC-01 Jalankan Alignment Rilis Terjadwal: penjadwalan sesi, pembukaan sesi,
+ * penyimpanan parameter analisis, dan pencatatan keputusan cycle (state machine Gambar 10.16).
+ */
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
@@ -18,7 +22,18 @@ export interface FormState {
   values?: Record<string, string>;
 }
 
-/** Nilai yang dikirim, dikembalikan saat validasi gagal agar isian pengguna tidak hilang. */
+/**
+ * Nilai formulir yang dikirim, dikembalikan saat validasi gagal agar isian pengguna tidak hilang.
+ *
+ * Parameters
+ * ----------
+ * f : FormData
+ *     Data formulir; field internal React (berawalan "$") diabaikan dan nilai ganda digabung koma.
+ *
+ * Returns
+ * -------
+ * Record<string, string>
+ */
 function echo(f: FormData): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of f.entries()) {
@@ -28,11 +43,41 @@ function echo(f: FormData): Record<string, string> {
   return out;
 }
 
+/**
+ * Membaca angka dari formulir; koma diterima sebagai pemisah desimal.
+ *
+ * Parameters
+ * ----------
+ * f : FormData
+ *     Data formulir.
+ * k : string
+ *     Nama field.
+ *
+ * Returns
+ * -------
+ * number
+ *     NaN bila kosong atau bukan angka.
+ */
 const num = (f: FormData, k: string) => {
   const raw = String(f.get(k) ?? "").replace(",", ".").trim();
   return raw === "" ? NaN : Number(raw);
 };
 
+/**
+ * Membaca dan memvalidasi error rate hasil uji Dev.
+ *
+ * Parameters
+ * ----------
+ * f : FormData
+ *     Data formulir.
+ * errors : Record<string, string>
+ *     Kumpulan galat; diisi bila nilai tidak valid.
+ *
+ * Returns
+ * -------
+ * number
+ *     Error rate dalam persen, atau 0 bila tidak valid.
+ */
 function devError(f: FormData, errors: Record<string, string>) {
   const v = num(f, "devErrorRatePct");
   if (Number.isNaN(v) || v < 0) {
@@ -42,6 +87,21 @@ function devError(f: FormData, errors: Record<string, string>) {
   return v;
 }
 
+/**
+ * Menjadwalkan sesi alignment baru berstatus Terjadwal (khusus Technical Lead).
+ *
+ * Parameters
+ * ----------
+ * _ : FormState
+ *     State sebelumnya dari useActionState (tidak dipakai).
+ * f : FormData
+ *     Layanan, nama rilis, versi uji, nomor cycle, dan jadwal.
+ *
+ * Returns
+ * -------
+ * Promise<FormState>
+ *     Galat validasi; bila berhasil, dialihkan ke halaman sesi.
+ */
 export async function scheduleSession(_: FormState, f: FormData): Promise<FormState> {
   const user = await requirePermission("alignment.schedule");
   const service = String(f.get("service") ?? "");
@@ -88,7 +148,20 @@ export async function scheduleSession(_: FormState, f: FormData): Promise<FormSt
   redirect(`/alignment/${s.id}`);
 }
 
-/** bukaSesi() lebih awal oleh Technical Lead. Sesi juga terbuka otomatis saat jadwal akhir sprint cycle tiba. */
+/**
+ * Membuka sesi lebih awal (bukaSesi()): Terjadwal -> Pengisian Parameter.
+ *
+ * Sesi juga terbuka otomatis saat jadwal akhir sprint cycle tiba.
+ *
+ * Parameters
+ * ----------
+ * sessionId : string
+ *     Identitas sesi.
+ *
+ * Returns
+ * -------
+ * Promise<void>
+ */
 export async function openSession(sessionId: string) {
   const user = await requirePermission("alignment.schedule");
   const s = await getSession(sessionId);
@@ -99,6 +172,27 @@ export async function openSession(sessionId: string) {
   revalidatePath("/", "layout");
 }
 
+/**
+ * Menyimpan ParameterAnalisis sesi (QA/Performance Tester atau Technical Lead).
+ *
+ * Parameter hanya dapat diubah pada Pengisian Parameter atau Peninjauan. Mengubah parameter
+ * saat Peninjauan ("uji varian lain") mengembalikan sesi ke Pengisian Parameter dan menaikkan
+ * versi parameter.
+ *
+ * Parameters
+ * ----------
+ * sessionId : string
+ *     Identitas sesi (diikat dengan bind).
+ * _ : FormState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     Isian parameter dan field "intent" ("save" atau "run").
+ *
+ * Returns
+ * -------
+ * Promise<FormState>
+ *     ok dan intent bila tersimpan, atau galat validasi per field beserta nilai yang dikirim.
+ */
 export async function saveParams(sessionId: string, _: FormState, f: FormData): Promise<FormState> {
   const user = await requirePermission("alignment.params");
   const s = await getSession(sessionId);
@@ -176,6 +270,26 @@ export async function saveParams(sessionId: string, _: FormState, f: FormData): 
   return { ok: true, intent: String(f.get("intent") ?? "save"), savedAt: Date.now() };
 }
 
+/**
+ * Mencatat keputusan cycle (khusus Technical Lead): Peninjauan -> Diputuskan -> Ditutup.
+ *
+ * Keputusan Lanjut Promosi ditolak untuk verdict Tidak Lolos dan Tidak Dapat Dinilai. Lanjut
+ * Promosi membuat dokumen sign-off (Draf -> Menunggu Keputusan); keduanya menyimpan laporan alignment.
+ *
+ * Parameters
+ * ----------
+ * sessionId : string
+ *     Identitas sesi (diikat dengan bind).
+ * _ : FormState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     decision ("LanjutPromosi" atau "KembaliKeDev"), notes, dan followUps (satu per baris).
+ *
+ * Returns
+ * -------
+ * Promise<FormState>
+ *     Galat validasi; bila berhasil, dialihkan ke halaman sesi dengan penanda keputusan.
+ */
 export async function decideCycle(sessionId: string, _: FormState, f: FormData): Promise<FormState> {
   const user = await requirePermission("alignment.decide");
   const s = await getSession(sessionId);

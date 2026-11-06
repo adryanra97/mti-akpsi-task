@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Navigasi samping (dan menu ponsel) dengan lencana tugas, mode analisis aktif, pengguna, dan tema.
+ */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -30,6 +33,22 @@ const NAV: { section: Section; href: string; label: string; icon: typeof Home }[
   { section: "settings", href: "/settings", label: "Pengaturan", icon: Settings },
 ];
 
+/**
+ * Navigasi utama sesuai akses peran.
+ *
+ * Parameters
+ * ----------
+ * user : { name: string; role: Role }
+ *     Pengguna yang sedang login.
+ * badges : Partial<Record<Section, number>>
+ *     Jumlah tugas per bagian.
+ * mode : string
+ *     Label mode analisis aktif.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Sidebar({
   user,
   badges,
@@ -48,6 +67,9 @@ export function Sidebar({
   }, []);
   useEffect(() => setOpen(false), [path]);
 
+  /**
+   * Mengganti tema terang/gelap dan menyimpannya di localStorage bila tersedia.
+   */
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;

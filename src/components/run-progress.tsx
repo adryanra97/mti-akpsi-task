@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Klien Core Module: mengajukan PermintaanAnalisis, membaca aliran progres NDJSON, dan
+ * menampilkan status permintaan serta langkah analisis secara langsung.
+ */
 import { useCallback, useState } from "react";
 import { CircleCheck, CircleDashed, CircleMinus, LoaderCircle, TriangleAlert } from "lucide-react";
 import { cx } from "./ui";
@@ -15,6 +19,24 @@ export interface StepState {
 
 const ORDER: RequestStatus[] = ["Diterima", "Disamarkan", "Direncanakan", "Dijalankan", "Dinilai", "Selesai"];
 
+/**
+ * Membaca JSON dari respons, atau melempar galat dengan pesan dari server.
+ *
+ * Parameters
+ * ----------
+ * res : Response
+ *     Respons fetch.
+ *
+ * Returns
+ * -------
+ * Promise<any>
+ *     Isi JSON bila status OK.
+ *
+ * Raises
+ * ------
+ * Error
+ *     Bila status tidak OK; pesan diambil dari field "error" bila ada.
+ */
 async function jsonOrError(res: Response) {
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error ?? j.detail ?? `Permintaan gagal (HTTP ${res.status}).`);
@@ -22,8 +44,24 @@ async function jsonOrError(res: Response) {
 }
 
 /**
- * Menjalankan satu PermintaanAnalisis: Dashboard menerbitkan token, Core Module Python mengalirkan progres,
- * lalu hasil bertanda tangan dikirim kembali ke Dashboard untuk diverifikasi dan disimpan.
+ * Hook untuk menjalankan satu PermintaanAnalisis dari awal sampai hasil tersimpan.
+ *
+ * Alur: Dashboard menerbitkan token (requestUrl), Core Module Python mengalirkan progres,
+ * lalu hasil bertanda tangan dikirim kembali ke Dashboard (resultUrl) untuk diverifikasi dan disimpan.
+ *
+ * Returns
+ * -------
+ * { steps, statuses, running, error, start }
+ *     steps : StepState[]
+ *         Langkah analisis terbaru, diperbarui setiap event.
+ *     statuses : RequestStatus[]
+ *         Status permintaan yang sudah dilalui.
+ *     running : boolean
+ *         true selama analisis berjalan.
+ *     error : string | null
+ *         Pesan galat terakhir.
+ *     start : (requestUrl: string, resultUrl: string, body?: unknown) => Promise<boolean>
+ *         Menjalankan analisis; bernilai true bila hasil berhasil disimpan.
  */
 export function useCoreRun() {
   const [steps, setSteps] = useState<StepState[]>([]);
@@ -88,6 +126,18 @@ export function useCoreRun() {
   return { steps, statuses, running, error, start };
 }
 
+/**
+ * Jalur status PermintaanAnalisis (Diterima sampai Selesai) dengan penanda status yang sudah dilalui.
+ *
+ * Parameters
+ * ----------
+ * statuses : RequestStatus[]
+ *     Status yang sudah dilalui; "Dihentikan" ditandai khusus.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function StatusTrack({ statuses }: { statuses: RequestStatus[] }) {
   const stopped = statuses.includes("Dihentikan");
   const order = stopped ? (["Diterima", "Disamarkan", "Direncanakan", "Dijalankan", "Dihentikan", "Dinilai", "Selesai"] as RequestStatus[]) : ORDER;
@@ -113,6 +163,18 @@ function StatusTrack({ statuses }: { statuses: RequestStatus[] }) {
   );
 }
 
+/**
+ * Daftar langkah analisis dengan ikon status (berjalan, selesai, peringatan, dilewati).
+ *
+ * Parameters
+ * ----------
+ * steps : StepState[]
+ *     Langkah dari event Core Module.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function StepList({ steps }: { steps: StepState[] }) {
   return (
     <ol className="grid gap-1.5">
@@ -139,6 +201,23 @@ function StepList({ steps }: { steps: StepState[] }) {
   );
 }
 
+/**
+ * Panel progres analisis untuk ditampilkan selama dan sesudah permintaan berjalan.
+ *
+ * Parameters
+ * ----------
+ * steps : StepState[]
+ *     Langkah analisis.
+ * statuses : RequestStatus[]
+ *     Status permintaan yang sudah dilalui.
+ * running : boolean
+ *     true selama analisis berjalan.
+ *
+ * Returns
+ * -------
+ * JSX.Element | null
+ *     null bila belum ada langkah.
+ */
 export function RunProgress({ steps, statuses, running }: { steps: StepState[]; statuses: RequestStatus[]; running: boolean }) {
   if (!steps.length && !running) return null;
   if (!running) {

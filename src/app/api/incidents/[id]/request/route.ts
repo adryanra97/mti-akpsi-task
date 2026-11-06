@@ -1,3 +1,6 @@
+/**
+ * API pengajuan reproduksi insiden dan penilaian opsi mitigasi.
+ */
 import { NextResponse } from "next/server";
 import { audit, currentUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
@@ -13,7 +16,21 @@ export const dynamic = "force-dynamic";
 
 const KEYS: (keyof MitigationChanges)[] = ["vcpu", "ramGb", "nodes", "threadPool", "connPool", "timeoutMs"];
 
-/** ajukanReproduksi() atau tambahOpsiMitigasi(perubahan), lalu menerbitkan PermintaanAnalisis bertanda tangan. */
+/**
+ * ajukanReproduksi() atau tambahOpsiMitigasi(perubahan), lalu menerbitkan PermintaanAnalisis bertanda tangan.
+ *
+ * Parameters
+ * ----------
+ * req : Request
+ *     Body JSON { kind: "reproduksi" } atau { kind: "mitigasi", label, changes }.
+ * params : Promise<{ id: string }>
+ *     Identitas insiden.
+ *
+ * Returns
+ * -------
+ * Promise<NextResponse>
+ *     { token, coreUrl } bila berhasil; galat bila status insiden atau perubahan tidak valid.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Permintaan ditolak." }, { status: 403 });
   const user = await currentUser();

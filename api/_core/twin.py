@@ -1,9 +1,25 @@
 """ModelDigitalTwin: replika Integration Server berbasis simulasi kejadian diskret (SimPy).
 
-Setiap node memiliki thread pool, inti CPU, dan connection pool sebagai simpy.Resource. Request datang
-mengikuti proses Poisson, dibagi round-robin ke node di belakang load balancer, lalu melewati
-CPU, database (memegang koneksi), dependensi eksternal, dan CPU lagi sambil memegang satu thread.
-Masukan yang sama dengan versi model yang sama selalu memberi angka yang sama (NFR-10).
+Setiap node memiliki thread pool, inti CPU, dan connection pool sebagai ``simpy.Resource``.
+Request datang mengikuti proses Poisson, dibagi round-robin ke node di belakang load balancer,
+lalu melewati CPU, database (memegang koneksi), dependensi eksternal, dan CPU lagi sambil
+memegang satu thread. Masukan yang sama dengan versi model yang sama selalu memberi angka
+yang sama (NFR-10).
+
+Attributes
+----------
+BUCKET_S : float
+    Resolusi deret waktu dalam detik.
+SAMPLE_S : float
+    Selang pencuplikan utilisasi dalam detik.
+WARMUP_S : float
+    Masa pemanasan yang tidak ikut diukur, dalam detik.
+DURATION_S : float
+    Panjang jendela ukur bawaan, dalam detik.
+QUEUE_FACTOR : int
+    Antrean thread maksimal sebagai kelipatan ukuran thread pool; sisanya ditolak (HTTP 503).
+CONN_WAIT_S : float
+    Batas tunggu connection pool sebelum request dianggap gagal, dalam detik.
 """
 from __future__ import annotations
 
@@ -25,6 +41,25 @@ CONN_WAIT_S = 1.0       # batas tunggu connection pool sebelum gagal
 
 @dataclass
 class Spesifikasi:
+    """Spesifikasi sumber daya per node pada environment target.
+
+    Attributes
+    ----------
+    vcpu : int
+        Jumlah vCPU per node.
+    ramGb : float
+        RAM per node dalam GB.
+    nodes : int
+        Jumlah node di belakang load balancer.
+    threadPool : int
+        Ukuran thread pool per node.
+    connPool : int
+        Ukuran connection pool database per node.
+    bandwidthMbps : float
+        Bandwidth jaringan per node dalam Mbps.
+    timeoutMs : int, default 3000
+        Batas waktu request dalam milidetik.
+    """
     vcpu: int
     ramGb: float
     nodes: int
@@ -35,6 +70,21 @@ class Spesifikasi:
 
     @staticmethod
     def dari(d: dict) -> "Spesifikasi":
+        """Membuat ``Spesifikasi`` dari dictionary masukan Dashboard.
+
+        Nilai bilangan bulat dibatasi minimal 1 agar simulasi tetap valid.
+
+        Parameters
+        ----------
+        d : dict
+            Dictionary dengan kunci ``vcpu``, ``ramGb``, ``nodes``, ``threadPool``,
+            ``connPool``, ``bandwidthMbps``, dan opsional ``timeoutMs``.
+
+        Returns
+        -------
+        Spesifikasi
+            Spesifikasi yang sudah dinormalisasi.
+        """
         return Spesifikasi(
             vcpu=max(int(d["vcpu"]), 1),
             ramGb=float(d["ramGb"]),
@@ -48,7 +98,29 @@ class Spesifikasi:
 
 @dataclass
 class Profil:
-    """Profil beban per request hasil kalibrasi."""
+    """Profil beban per request hasil kalibrasi.
+
+    Attributes
+    ----------
+    cpuMs : float
+        Waktu CPU per request dalam milidetik.
+    dbMs : float
+        Waktu database selama memegang koneksi, dalam milidetik.
+    extMs : float
+        Waktu tunggu dependensi eksternal dalam milidetik.
+    payloadKb : float
+        Ukuran payload rata-rata dalam KB.
+    memDasarGb : float
+        Memori dasar per node dalam GB.
+    memPerReqMb : float
+        Memori per request yang sedang diproses, dalam MB.
+    errorDasarPct : float, default 0.0
+        Error rate dasar yang tidak bergantung pada beban, dalam persen.
+    bocorGb : float, default 0.0
+        Akumulasi kebocoran memori per node (kasus memory leak), dalam GB.
+    porsiBatch : float, default 0.0
+        Porsi inti CPU yang dipakai batch job (kasus batch overlap), 0 sampai 1.
+    """
     cpuMs: float            # waktu CPU per request (ms)
     dbMs: float             # waktu database selama memegang koneksi (ms)
     extMs: float            # waktu tunggu dependensi eksternal (ms)
@@ -62,17 +134,57 @@ class Profil:
 
 @dataclass
 class HasilSimulasi:
+    """Keluaran satu kali simulasi digital twin.
+
+    Attributes
+    ----------
+    ringkasan : dict
+        Indikator agregat: utilisasi CPU, memori, jaringan, thread pool, connection pool,
+        persentil latensi, error rate, timeout, dan throughput.
+    deretWaktu : list of dict
+        Trajektori per ``BUCKET_S`` detik dengan kunci ``t``, ``cpu``, ``mem``, ``net``,
+        ``thread``, ``conn``, dan ``p95``.
+    komponenLatensiMs : dict
+        Rata-rata waktu per komponen (antrean thread, antrean CPU, CPU, antrean koneksi,
+        database, eksternal) dalam milidetik per request.
+    """
     ringkasan: dict
     deretWaktu: list = field(default_factory=list)
     komponenLatensiMs: dict = field(default_factory=dict)
 
 
 def benih(*parts) -> int:
+    """Menghitung seed acak deterministik dari sekumpulan nilai.
+
+    Parameters
+    ----------
+    *parts : object
+        Nilai apa pun yang dapat diserialisasi JSON (memakai ``str`` sebagai cadangan).
+
+    Returns
+    -------
+    int
+        Seed 48-bit dari hash SHA-256 masukan.
+    """
     raw = json.dumps(parts, sort_keys=True, default=str).encode()
     return int(hashlib.sha256(raw).hexdigest()[:12], 16)
 
 
 def _pct(xs: list[float], p: float) -> float:
+    """Menghitung persentil dengan metode nearest-rank.
+
+    Parameters
+    ----------
+    xs : list of float
+        Sampel nilai.
+    p : float
+        Persentil dalam rentang 0 sampai 1.
+
+    Returns
+    -------
+    float
+        Nilai persentil, atau 0.0 bila ``xs`` kosong.
+    """
     if not xs:
         return 0.0
     s = sorted(xs)
@@ -81,13 +193,41 @@ def _pct(xs: list[float], p: float) -> float:
 
 
 def simulasikan(spec: Spesifikasi, pr: Profil, tps: float, seed: int, durasi_s: float = DURATION_S) -> HasilSimulasi:
+    """Menjalankan simulasi kejadian diskret satu skenario beban.
+
+    Parameters
+    ----------
+    spec : Spesifikasi
+        Spesifikasi node yang disimulasikan.
+    pr : Profil
+        Profil beban per request hasil kalibrasi.
+    tps : float
+        Laju kedatangan request (transaksi per detik) untuk seluruh node.
+    seed : int
+        Seed acak; seed yang sama memberi hasil yang sama.
+    durasi_s : float, default DURATION_S
+        Panjang jendela ukur setelah masa pemanasan, dalam detik.
+
+    Returns
+    -------
+    HasilSimulasi
+        Ringkasan indikator, deret waktu, dan rincian komponen latensi.
+
+    Notes
+    -----
+    Error rate menghitung request yang ditolak karena antrean penuh, gagal mendapat koneksi
+    dalam ``CONN_WAIT_S``, melewati timeout, serta request yang masih tertahan di antrean
+    pada akhir jendela ukur.
+    """
     env = simpy.Environment()
     rng = random.Random(seed)
     total = WARMUP_S + durasi_s
     nbucket = int(math.ceil(total / BUCKET_S))
 
     class Node:
+        """Satu node Integration Server dengan sumber daya SimPy-nya."""
         def __init__(self):
+            """Membuat thread pool, inti CPU, dan connection pool untuk node ini."""
             self.threads = simpy.Resource(env, capacity=spec.threadPool)
             self.cpu = simpy.Resource(env, capacity=spec.vcpu)
             self.conns = simpy.Resource(env, capacity=spec.connPool)
@@ -106,9 +246,37 @@ def simulasikan(spec: Spesifikasi, pr: Profil, tps: float, seed: int, durasi_s: 
     b_n = [0] * nbucket
 
     def bucket(t: float) -> int:
+        """Memetakan waktu simulasi ke indeks bucket deret waktu.
+
+        Parameters
+        ----------
+        t : float
+            Waktu simulasi dalam detik.
+
+        Returns
+        -------
+        int
+            Indeks bucket, dibatasi pada bucket terakhir.
+        """
         return min(nbucket - 1, int(t / BUCKET_S))
 
     def kerja_cpu(node: Node, ms: float, rec: dict):
+        """Proses SimPy: mengantre inti CPU lalu bekerja selama waktu acak eksponensial.
+
+        Parameters
+        ----------
+        node : Node
+            Node tempat request diproses.
+        ms : float
+            Rata-rata waktu CPU dalam milidetik.
+        rec : dict
+            Pencatat komponen latensi request ini; ``antreCpu`` dan ``cpu`` ditambahkan.
+
+        Yields
+        ------
+        simpy.events.Event
+            Event permintaan CPU dan timeout kerja.
+        """
         t0 = env.now
         with node.cpu.request() as c:
             yield c
@@ -119,6 +287,21 @@ def simulasikan(spec: Spesifikasi, pr: Profil, tps: float, seed: int, durasi_s: 
             b_cpu[bucket(env.now)] += dur
 
     def request(node: Node):
+        """Proses SimPy untuk satu request dari kedatangan sampai selesai.
+
+        Request ditolak bila antrean thread penuh, gagal bila connection pool tidak tersedia
+        dalam ``CONN_WAIT_S``, dan dicatat timeout bila latensinya melewati ``spec.timeoutMs``.
+
+        Parameters
+        ----------
+        node : Node
+            Node tujuan hasil round-robin load balancer.
+
+        Yields
+        ------
+        simpy.events.Event
+            Event sumber daya dan timeout selama request diproses.
+        """
         t0 = env.now
         st["tiba"] += 1 if t0 >= WARMUP_S else 0
         if len(node.threads.queue) >= spec.threadPool * QUEUE_FACTOR:
@@ -162,12 +345,33 @@ def simulasikan(spec: Spesifikasi, pr: Profil, tps: float, seed: int, durasi_s: 
 
     def batch_job(node: Node, cores: int):
         # Batch job memakai sebagian inti CPU sepanjang simulasi.
+        """Proses SimPy batch job yang menduduki sebagian inti CPU sepanjang simulasi.
+
+        Parameters
+        ----------
+        node : Node
+            Node yang menjalankan batch job.
+        cores : int
+            Jumlah inti CPU yang diduduki.
+
+        Yields
+        ------
+        simpy.events.Event
+            Event permintaan CPU dan timeout panjang.
+        """
         reqs = [node.cpu.request() for _ in range(cores)]
         for r in reqs:
             yield r
         yield env.timeout(total + 1)
 
     def kedatangan():
+        """Proses SimPy pembangkit kedatangan request (proses Poisson) secara round-robin.
+
+        Yields
+        ------
+        simpy.events.Timeout
+            Jeda antar-kedatangan berdistribusi eksponensial.
+        """
         i = 0
         while True:
             yield env.timeout(rng.expovariate(tps))
@@ -175,6 +379,13 @@ def simulasikan(spec: Spesifikasi, pr: Profil, tps: float, seed: int, durasi_s: 
             i += 1
 
     def pemantau():
+        """Proses SimPy yang mencuplik utilisasi thread, koneksi, dan memori setiap ``SAMPLE_S``.
+
+        Yields
+        ------
+        simpy.events.Timeout
+            Jeda pencuplikan.
+        """
         while True:
             b = bucket(env.now)
             busy_t = sum(n.threads.count for n in nodes) / (spec.threadPool * spec.nodes)
@@ -244,7 +455,40 @@ def simulasikan(spec: Spesifikasi, pr: Profil, tps: float, seed: int, durasi_s: 
 
 def kalibrasi(spec: Spesifikasi, cpu_pct: float, tps: float, p95_ms: float, mem_pct: float, payload_kb: float,
               error_pct: float, porsi_db: float, seed_dasar: int) -> tuple[Profil, dict]:
-    """Menyetel waktu tunggu database dan dependensi eksternal sampai p95 simulasi mendekati p95 terukur."""
+    """Mengkalibrasi profil beban agar p95 simulasi mendekati p95 hasil uji.
+
+    CPU per request diturunkan dari utilisasi CPU terukur; waktu tunggu database dan
+    dependensi eksternal disetel berulang (maksimal empat iterasi) sampai galat p95 di bawah 5%.
+
+    Parameters
+    ----------
+    spec : Spesifikasi
+        Spesifikasi environment tempat pengukuran dilakukan (Dev atau baseline Production).
+    cpu_pct : float
+        Utilisasi CPU terukur dalam persen.
+    tps : float
+        Beban saat pengukuran (transaksi per detik).
+    p95_ms : float
+        Response time p95 terukur dalam milidetik.
+    mem_pct : float
+        Utilisasi memori terukur dalam persen.
+    payload_kb : float
+        Ukuran payload rata-rata dalam KB.
+    error_pct : float
+        Error rate terukur dalam persen, dipakai sebagai error dasar.
+    porsi_db : float
+        Porsi waktu tunggu yang dihabiskan di database (0 sampai 1); sisanya eksternal.
+    seed_dasar : int
+        Seed awal; setiap iterasi memakai ``seed_dasar + i``.
+
+    Returns
+    -------
+    profil : Profil
+        Profil beban hasil kalibrasi.
+    info : dict
+        Ringkasan kalibrasi: acuan, p95 simulasi, galat persen, CPU per request,
+        dan waktu tunggu database serta eksternal.
+    """
     tps = max(tps, 0.1)
     cpu_ms = max(cpu_pct / 100 * spec.vcpu * spec.nodes * 1000 / tps, 0.5)
     tunggu = max(p95_ms * 0.4 - cpu_ms, 5.0)
@@ -252,6 +496,18 @@ def kalibrasi(spec: Spesifikasi, cpu_pct: float, tps: float, p95_ms: float, mem_
     mem_dasar = max(mem_pct / 100 * spec.ramGb - (tps / spec.nodes) * 0.2 * mem_req / 1024, 0.2)
 
     def profil(t):
+        """Membuat ``Profil`` untuk total waktu tunggu tertentu.
+
+        Parameters
+        ----------
+        t : float
+            Total waktu tunggu database dan eksternal dalam milidetik.
+
+        Returns
+        -------
+        Profil
+            Profil dengan waktu tunggu dibagi menurut ``porsi_db``.
+        """
         return Profil(cpuMs=cpu_ms, dbMs=t * porsi_db, extMs=t * (1 - porsi_db), payloadKb=payload_kb,
                       memDasarGb=mem_dasar, memPerReqMb=mem_req, errorDasarPct=error_pct)
 
@@ -277,7 +533,31 @@ def kalibrasi(spec: Spesifikasi, cpu_pct: float, tps: float, p95_ms: float, mem_
 
 def kapasitas_littles_law(spec: Spesifikasi, pr: Profil, hasil_puncak: HasilSimulasi, tps_puncak: float,
                           batas_cpu_pct: float) -> dict:
-    """Capacity planning dengan Little's Law (L = lambda x W) dan batas kapasitas tiap sumber daya."""
+    """Menghitung kapasitas maksimum dengan Little's Law dan batas tiap sumber daya.
+
+    Kapasitas dihitung untuk CPU, thread pool, connection pool, dan jaringan; yang terkecil
+    menjadi pembatas. Little's Law (L = lambda x W) dipakai untuk thread pool dan connection
+    pool serta untuk menyarankan ukuran thread pool per node.
+
+    Parameters
+    ----------
+    spec : Spesifikasi
+        Spesifikasi Production yang dinilai.
+    pr : Profil
+        Profil beban hasil kalibrasi.
+    hasil_puncak : HasilSimulasi
+        Hasil simulasi pada beban puncak, sumber waktu tinggal W per komponen.
+    tps_puncak : float
+        Beban puncak (lambda) dalam transaksi per detik.
+    batas_cpu_pct : float
+        Batas utilisasi CPU pada kriteria penerimaan, dalam persen.
+
+    Returns
+    -------
+    dict
+        ``kapasitasMaksTps``, ``pembatas``, ``perSumberDaya`` (dengan rumus), dan
+        ``littlesLaw`` (lambda, W, L, thread tersedia dan disarankan per node).
+    """
     w_thread = max((hasil_puncak.komponenLatensiMs.get("cpu", 0) + hasil_puncak.komponenLatensiMs.get("antreCpu", 0)
                     + hasil_puncak.komponenLatensiMs.get("antreKoneksi", 0) + hasil_puncak.komponenLatensiMs.get("database", 0)
                     + hasil_puncak.komponenLatensiMs.get("eksternal", 0)) / 1000, 0.001)

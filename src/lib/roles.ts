@@ -1,3 +1,8 @@
+/**
+ * Akun pengujian per peran, label peran, izin tindakan, dan akses halaman.
+ *
+ * Akun sengaja memakai nama peran, bukan nama orang, agar tidak ada PII.
+ */
 import type { Role } from "./types";
 
 export interface DemoUser {
@@ -54,6 +59,21 @@ const PERMS: Record<Permission, Role[]> = {
   "settings.manage": ["TL"],
 };
 
+/**
+ * Memeriksa apakah sebuah peran memiliki izin tindakan.
+ *
+ * Parameters
+ * ----------
+ * role : Role
+ *     Peran pengguna.
+ * perm : Permission
+ *     Izin yang diperiksa, misalnya "alignment.decide".
+ *
+ * Returns
+ * -------
+ * boolean
+ *     true bila diizinkan.
+ */
 export function can(role: Role, perm: Permission) {
   return PERMS[perm].includes(role);
 }
@@ -69,6 +89,19 @@ export const SECTION_ACCESS: Record<Section, Role[]> = {
   settings: ["TL"],
 };
 
+/**
+ * Menentukan bagian aplikasi dari path URL, untuk pemeriksaan akses halaman.
+ *
+ * Parameters
+ * ----------
+ * path : string
+ *     Pathname, misalnya "/alignment/aln-rilis-qris-c1".
+ *
+ * Returns
+ * -------
+ * Section
+ *     Bagian aplikasi; "home" bila tidak cocok dengan bagian lain.
+ */
 export function sectionForPath(path: string): Section {
   if (path.startsWith("/alignment")) return "alignment";
   if (path.startsWith("/incidents")) return "incidents";

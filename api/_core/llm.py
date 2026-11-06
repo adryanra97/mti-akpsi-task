@@ -1,4 +1,17 @@
-"""Antarmuka Layanan LLM melalui LangChain (NFR-17: penyedia dapat diganti tanpa mengubah alur use case)."""
+"""Antarmuka Layanan LLM melalui LangChain.
+
+Penyedia dapat diganti tanpa mengubah alur use case (NFR-17). Mendukung Anthropic Claude,
+OpenAI (atau layanan kompatibel OpenAI lewat ``OPENAI_BASE_URL``), dan Google Gemini.
+
+Attributes
+----------
+VERSI_PROMPT : str
+    Versi templat prompt yang dicatat pada jejak keputusan.
+SISTEM : str
+    Pesan sistem untuk semua panggilan LLM.
+ENV_KEY : dict of str
+    Nama environment variable API key per penyedia.
+"""
 from __future__ import annotations
 
 import os
@@ -16,17 +29,52 @@ SISTEM = (
 
 
 class LangkahLLM(BaseModel):
+    """Satu langkah rencana analisis yang diusulkan LLM.
+
+    Attributes
+    ----------
+    deskripsi : str
+        Apa yang dikerjakan langkah ini.
+    alat : {"jalankan_serversim", "estimasi_serverbrief", "kueri_metrik_elk"}
+        Alat agen yang dipakai.
+    acuan : str
+        Kunci skenario atau komponen yang dirujuk.
+    """
     deskripsi: str = Field(description="Apa yang dikerjakan langkah ini")
     alat: Literal["jalankan_serversim", "estimasi_serverbrief", "kueri_metrik_elk"]
     acuan: str = Field(description="Kunci skenario atau komponen yang dirujuk, persis seperti di daftar")
 
 
 class RencanaLLM(BaseModel):
+    """Rencana analisis terstruktur dari LLM.
+
+    Attributes
+    ----------
+    ringkasanTujuan : str
+        Satu kalimat tujuan dan risiko utama.
+    langkah : list of LangkahLLM
+        Urutan langkah analisis.
+    """
     ringkasanTujuan: str = Field(description="Satu kalimat tujuan dan risiko utama yang diperhatikan")
     langkah: list[LangkahLLM]
 
 
 class EstimasiLLM(BaseModel):
+    """Estimasi penalaran untuk komponen di luar cakupan model digital twin.
+
+    Attributes
+    ----------
+    cpuPct, memPct, threadPct : float
+        Perkiraan utilisasi dalam persen.
+    p95Ms : float
+        Perkiraan response time p95 dalam milidetik.
+    errorRatePct : float
+        Perkiraan error rate dalam persen.
+    keyakinan : float
+        Skor keyakinan 0 sampai 1.
+    alasan : str
+        Penjelasan singkat dasar estimasi.
+    """
     cpuPct: float
     memPct: float
     threadPct: float
@@ -37,6 +85,7 @@ class EstimasiLLM(BaseModel):
 
 
 class GagalLLM(Exception):
+    """Galat panggilan LLM: API key kosong, penyedia tidak dikenal, jaringan, atau keluaran tidak sesuai skema."""
     pass
 
 
@@ -44,7 +93,28 @@ ENV_KEY = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini
 
 
 class LayananLLM:
+    """Pembungkus model chat LangChain dengan pencatatan token dan biaya.
+
+    Parameters
+    ----------
+    provider : {"anthropic", "openai", "gemini"}
+        Penyedia LLM.
+    model : str
+        Nama model pada penyedia tersebut.
+    harga : dict
+        Harga per satu juta token dalam USD, dengan kunci ``input`` dan ``output``.
+    kurs : float
+        Kurs USD ke IDR untuk estimasi biaya.
+
+    Attributes
+    ----------
+    pengiriman : int
+        Banyaknya panggilan ke LLM.
+    token_masuk, token_keluar : int
+        Akumulasi token masukan dan keluaran.
+    """
     def __init__(self, provider: str, model: str, harga: dict, kurs: float):
+        """Menyimpan konfigurasi; model chat baru dibuat saat panggilan pertama."""
         self.provider = provider
         self.model = model
         self.harga = harga
@@ -55,6 +125,18 @@ class LayananLLM:
         self._chat = None
 
     def _model(self):
+        """Membuat (sekali) dan mengembalikan model chat LangChain sesuai penyedia.
+
+        Returns
+        -------
+        langchain_core.language_models.BaseChatModel
+            Model chat yang siap dipanggil.
+
+        Raises
+        ------
+        GagalLLM
+            Bila API key belum diisi atau penyedia tidak dikenal.
+        """
         if self._chat is not None:
             return self._chat
         key = os.environ.get(ENV_KEY.get(self.provider, ""), "")
@@ -75,12 +157,38 @@ class LayananLLM:
         return self._chat
 
     def _catat_pemakaian(self, msg):
+        """Menambah hitungan panggilan dan token dari metadata pesan.
+
+        Parameters
+        ----------
+        msg : langchain_core.messages.AIMessage or None
+            Pesan balasan model; ``usage_metadata`` dibaca bila ada.
+        """
         self.pengiriman += 1
         usage = getattr(msg, "usage_metadata", None) or {}
         self.token_masuk += int(usage.get("input_tokens", 0) or 0)
         self.token_keluar += int(usage.get("output_tokens", 0) or 0)
 
     def terstruktur(self, skema: type[BaseModel], prompt: str):
+        """Memanggil LLM dengan keluaran terstruktur sesuai skema Pydantic.
+
+        Parameters
+        ----------
+        skema : type of pydantic.BaseModel
+            Skema keluaran, misalnya ``RencanaLLM`` atau ``EstimasiLLM``.
+        prompt : str
+            Isi pesan pengguna (data sudah disamarkan).
+
+        Returns
+        -------
+        pydantic.BaseModel
+            Instans ``skema`` hasil parsing.
+
+        Raises
+        ------
+        GagalLLM
+            Bila panggilan gagal atau keluaran tidak dapat diparsing.
+        """
         try:
             hasil = self._model().with_structured_output(skema, include_raw=True).invoke(
                 [("system", SISTEM), ("human", prompt)]
@@ -95,6 +203,23 @@ class LayananLLM:
         return hasil["parsed"]
 
     def teks(self, prompt: str) -> str:
+        """Memanggil LLM untuk keluaran teks bebas.
+
+        Parameters
+        ----------
+        prompt : str
+            Isi pesan pengguna.
+
+        Returns
+        -------
+        str
+            Teks balasan model tanpa spasi di awal dan akhir.
+
+        Raises
+        ------
+        GagalLLM
+            Bila panggilan gagal.
+        """
         try:
             msg = self._model().invoke([("system", SISTEM), ("human", prompt)])
         except GagalLLM:
@@ -108,6 +233,13 @@ class LayananLLM:
         return str(c).strip()
 
     def biaya(self) -> dict:
+        """Estimasi biaya pemakaian LLM sejauh ini.
+
+        Returns
+        -------
+        dict
+            ``pengiriman``, ``tokenMasuk``, ``tokenKeluar``, ``usd``, dan ``idr``.
+        """
         usd = (self.token_masuk * self.harga.get("input", 0) + self.token_keluar * self.harga.get("output", 0)) / 1_000_000
         return {
             "pengiriman": self.pengiriman,

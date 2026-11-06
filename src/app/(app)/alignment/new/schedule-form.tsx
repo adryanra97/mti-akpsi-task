@@ -1,11 +1,28 @@
 "use client";
 
+/**
+ * Formulir penjadwalan sesi alignment.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { scheduleSession, type FormState } from "../actions";
 import { Button, ButtonLink, Field, Input, Select } from "@/components/ui";
 
+/**
+ * Formulir layanan, rilis, versi uji, nomor cycle, dan jadwal alignment meeting.
+ *
+ * Parameters
+ * ----------
+ * services : { name: string; twin: boolean }[]
+ *     Layanan pada registri dan apakah memiliki model digital twin aktif.
+ * latest : Record<string, { release: string; cycleNo: number }>
+ *     Rilis dan cycle terakhir per layanan, untuk mengisi saran nomor cycle berikutnya.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function ScheduleForm({
   services,
   latest,

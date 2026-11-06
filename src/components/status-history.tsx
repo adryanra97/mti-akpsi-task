@@ -1,9 +1,29 @@
+/**
+ * Riwayat transisi state machine (Bab 10) untuk sesi, insiden, dan dokumen sign-off.
+ */
 import type { StatusEvent } from "@/lib/types";
 import { History } from "lucide-react";
 import { cx } from "./ui";
 import { fmtDate } from "@/lib/format";
 
-/** Riwayat transisi state machine (Bab 10.3): status, waktu, pelaku, dan event pemicunya. */
+/**
+ * Riwayat status ringkas yang bisa dibuka: daftar state, status saat ini, dan setiap transisi.
+ *
+ * Parameters
+ * ----------
+ * history : StatusEvent<S>[]
+ *     Riwayat transisi (status, waktu, pelaku, catatan).
+ * labels : Record<S, string>
+ *     Label tampilan setiap status.
+ * states : S[]
+ *     Seluruh status pada state machine, berurutan.
+ * title : string
+ *     Nama objek, misalnya "Status sesi".
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function StatusHistory<S extends string>({
   history,
   labels,

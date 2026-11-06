@@ -1,7 +1,25 @@
-"""Membangkitkan data contoh dengan menjalankan Core Module (mode demo) pada skenario riwayat rilis dan insiden.
+"""Membangkitkan data contoh dengan menjalankan Core Module (mode demo).
 
-Jalankan dari akar repo:  python3 scripts/buat_data_contoh.py
-Keluaran: src/lib/seed-data.json (dibaca src/lib/seed.ts saat database pertama kali diisi).
+Skenario riwayat rilis dan insiden dijalankan dengan AgenAnalisis pada waktu acuan tetap
+sehingga hasilnya deterministik.
+
+Jalankan dari akar repo::
+
+    python3 scripts/buat_data_contoh.py
+
+Keluaran berupa ``src/lib/seed-data.json``, dibaca ``src/lib/seed.ts`` saat database
+pertama kali diisi.
+
+Attributes
+----------
+SEKARANG : datetime
+    Waktu acuan analisis untuk seluruh data contoh.
+DEMO : dict
+    Pengaturan Core Module mode demo.
+SESI : list of dict
+    Skenario sesi alignment per rilis dan sprint cycle.
+INSIDEN : list of dict
+    Skenario insiden beserta opsi mitigasi yang diuji.
 """
 import copy
 import json
@@ -19,11 +37,43 @@ DEMO = {"mode": "demo", "ambang": 0.7, "sampel": 3, "harga": {"input": 3, "outpu
 
 
 def spesifikasi(layanan, **ubah):
+    """Spesifikasi Production sebuah layanan dari registri, dengan perubahan opsional.
+
+    Parameters
+    ----------
+    layanan : str
+        Nama layanan pada registri.
+    **ubah
+        Field spesifikasi yang ditimpa, misalnya ``nodes=2``.
+
+    Returns
+    -------
+    dict
+        Spesifikasi hasil gabungan.
+    """
     s = next(x for x in REGISTRI["layanan"] if x["nama"] == layanan)["spesifikasi"]
     return {**s, **ubah}
 
 
 def parameter(layanan, dev=None, prod=None, **ubah):
+    """Membuat ParameterAnalisis alignment dengan nilai bawaan yang wajar.
+
+    Parameters
+    ----------
+    layanan : str
+        Nama layanan; spesifikasi Production diambil dari registri.
+    dev : dict, optional
+        Field ringkasan uji Dev yang ditimpa.
+    prod : dict, optional
+        Field spesifikasi Production yang ditimpa.
+    **ubah
+        Field parameter tingkat atas yang ditimpa, misalnya ``peakTps``.
+
+    Returns
+    -------
+    dict
+        Parameter analisis lengkap.
+    """
     p = {
         "normalTps": 8, "peakTps": 45, "whatIf": [2, 3], "serviceVersion": "", "configChanges": "",
         "criteria": {"maxP95Ms": 800, "maxErrorRatePct": 1, "maxCpuPct": 80, "maxMemPct": 85},
@@ -111,6 +161,11 @@ INSIDEN = [
 
 
 def main():
+    """Menjalankan seluruh skenario lalu menulis ``src/lib/seed-data.json``.
+
+    Sesi yang memiliki parameter dan keputusan dianalisis dalam mode Alignment. Setiap insiden
+    direproduksi lalu setiap opsi mitigasinya dinilai. Ringkasan verdict dicetak ke stdout.
+    """
     out = {"versi": 3, "sesi": [], "insiden": []}
     for s in SESI:
         s = copy.deepcopy(s)

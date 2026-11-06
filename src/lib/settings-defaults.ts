@@ -1,3 +1,8 @@
+/**
+ * Nilai bawaan pengaturan aplikasi, label penyedia LLM, dan saran nama model.
+ *
+ * Dipisah dari settings.ts agar dapat diimpor komponen klien tanpa kode server.
+ */
 import type { AppSettings, ProviderId } from "./types";
 
 export const DEFAULT_SETTINGS: AppSettings = {

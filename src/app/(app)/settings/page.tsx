@@ -1,3 +1,6 @@
+/**
+ * Halaman Pengaturan (khusus Technical Lead) beserta status database dan log audit.
+ */
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
 import { listAudit } from "@/lib/data";
@@ -10,6 +13,13 @@ import { ROLE_LABEL } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "Pengaturan" };
 
+/**
+ * Halaman Pengaturan.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function SettingsPage() {
   await requireUser();
   const [settings, kind, auditLog] = await Promise.all([getSettings(), dbKind(), listAudit()]);

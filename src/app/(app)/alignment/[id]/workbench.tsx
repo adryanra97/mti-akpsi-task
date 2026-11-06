@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Panel parameter analisis: ringkasan parameter tersimpan, formulir pengisian, dan pengajuan analisis.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,6 +17,22 @@ const WHATIF = [2, 3, 5, 10];
 
 type NumField = { name: string; label: string; value: number; hint?: string; unit?: string };
 
+/**
+ * Isian angka dengan label, satuan, petunjuk, dan galat.
+ *
+ * Parameters
+ * ----------
+ * f : NumField
+ *     Definisi field (nama, label, satuan, nilai awal, petunjuk).
+ * error : string, optional
+ *     Pesan galat validasi.
+ * values : Record<string, string>, optional
+ *     Nilai yang dikirim terakhir, dipakai ulang saat validasi gagal.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function NumberInput({ f, error, values }: { f: NumField; error?: string; values?: Record<string, string> }) {
   return (
     <Field label={f.unit ? `${f.label} (${f.unit})` : f.label} htmlFor={f.name} hint={f.hint} error={error}>
@@ -31,6 +50,22 @@ function NumberInput({ f, error, values }: { f: NumField; error?: string; values
   );
 }
 
+/**
+ * Kelompok isian formulir dengan judul dan keterangan.
+ *
+ * Parameters
+ * ----------
+ * title : string
+ *     Judul kelompok.
+ * description : string, optional
+ *     Keterangan kelompok.
+ * children : ReactNode
+ *     Isian di dalam kelompok.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function Group({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <fieldset className="grid gap-4 border-t border-line pt-5 first:border-0 first:pt-0">
@@ -44,6 +79,34 @@ function Group({ title, description, children }: { title: string; description?: 
   );
 }
 
+/**
+ * Panel parameter dan pengajuan analisis untuk satu sesi.
+ *
+ * Parameters
+ * ----------
+ * sessionId : string
+ *     Identitas sesi.
+ * params : AlignmentParams
+ *     Parameter tersimpan, draf dari cycle sebelumnya, atau nilai bawaan.
+ * hasSavedParams : boolean
+ *     Parameter sudah pernah disimpan.
+ * draftNote : string, optional
+ *     Penjelasan bila isian diambil dari cycle sebelumnya.
+ * canEdit : boolean
+ *     Pengguna boleh mengubah parameter pada status saat ini.
+ * canRun : boolean
+ *     Pengguna boleh mengajukan analisis pada status saat ini.
+ * needsRun : boolean
+ *     Parameter berubah sejak analisis terakhir.
+ * hasRuns : boolean
+ *     Sesi sudah pernah dianalisis.
+ * waiting : boolean
+ *     Sesi berstatus Menunggu Hasil.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Workbench({
   sessionId,
   params,
@@ -75,6 +138,13 @@ export function Workbench({
   const vals = state.errors ? state.values : undefined;
   const sv = (k: string, d: string) => vals?.[k] ?? d;
 
+  /**
+   * Mengajukan analisis ke Core Module lalu memuat ulang halaman bila hasil tersimpan.
+   *
+   * Returns
+   * -------
+   * Promise<void>
+   */
   async function startRun() {
     const ok = await run.start(`/api/alignment/${sessionId}/request`, `/api/alignment/${sessionId}/result`);
     if (ok) {

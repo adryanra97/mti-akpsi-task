@@ -1,3 +1,6 @@
+/**
+ * Daftar istilah aplikasi (sprint cycle, release candidate, verdict, digital twin, dan lainnya).
+ */
 import { BookOpen } from "lucide-react";
 
 const TERMS: [string, string][] = [
@@ -11,7 +14,18 @@ const TERMS: [string, string][] = [
   ["TPS", "Transaksi per detik, ukuran seberapa berat beban yang diterima layanan."],
 ];
 
-/** Penjelasan istilah singkat untuk pengguna baru (heuristik NNG: help and documentation). */
+/**
+ * Panel istilah yang bisa dibuka-tutup.
+ *
+ * Parameters
+ * ----------
+ * defaultOpen : boolean, default false
+ *     Buka panel saat pertama tampil.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Glossary({ defaultOpen = false }: { defaultOpen?: boolean }) {
   return (
     <details className="group rounded-[10px] border border-line bg-surface" open={defaultOpen}>

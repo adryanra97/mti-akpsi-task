@@ -1,3 +1,6 @@
+/**
+ * Halaman dokumen sign-off: isi dokumen bernomor, keputusan, dan unduhan PDF.
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -13,6 +16,18 @@ import { fmtDate, fmtNum } from "@/lib/format";
 import { LIMITING_LABEL, ROUTE_LABEL, SIGNOFF_STATUS_LABEL, VERDICT_LABEL } from "@/lib/verdict";
 import type { SignoffStatus } from "@/lib/types";
 
+/**
+ * Judul tab browser untuk dokumen sign-off.
+ *
+ * Parameters
+ * ----------
+ * params : Promise<{ id: string }>
+ *     Parameter rute.
+ *
+ * Returns
+ * -------
+ * Promise<Metadata>
+ */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const d = await getSignoff((await params).id);
   return { title: d ? `Sign-off ${d.code}` : "Sign-off" };
@@ -20,6 +35,22 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 const STATES: SignoffStatus[] = ["Draf", "MenungguKeputusan", "Disetujui", "Ditolak"];
 
+/**
+ * Bagian bernomor pada dokumen sign-off.
+ *
+ * Parameters
+ * ----------
+ * n : number
+ *     Nomor bagian.
+ * title : string
+ *     Judul bagian.
+ * children : ReactNode
+ *     Isi bagian.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <section className="border-t border-line py-5 first:border-0 first:pt-0">
@@ -31,6 +62,20 @@ function Section({ n, title, children }: { n: number; title: string; children: R
   );
 }
 
+/**
+ * Halaman dokumen sign-off.
+ *
+ * Parameters
+ * ----------
+ * params : Promise<{ id: string }>
+ *     Identitas dokumen.
+ * searchParams : Promise<{ keputusan?: string }>
+ *     "keputusan" terisi setelah keputusan tersimpan.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function SignoffPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ keputusan?: string }> }) {
   const user = await requireUser();
   const { id } = await params;

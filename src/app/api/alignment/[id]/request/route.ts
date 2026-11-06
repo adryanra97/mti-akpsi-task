@@ -1,3 +1,6 @@
+/**
+ * API pengajuan analisis alignment.
+ */
 import { NextResponse } from "next/server";
 import { audit, currentUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
@@ -10,7 +13,21 @@ import { sameOrigin } from "@/lib/stream";
 
 export const dynamic = "force-dynamic";
 
-/** Langkah ajukan(): Pengisian Parameter [lengkap] -> Menunggu Hasil, lalu menerbitkan PermintaanAnalisis bertanda tangan. */
+/**
+ * Langkah ajukan(): Pengisian Parameter [lengkap] -> Menunggu Hasil, lalu menerbitkan PermintaanAnalisis bertanda tangan.
+ *
+ * Parameters
+ * ----------
+ * req : Request
+ *     Permintaan dari peramban (asal yang sama).
+ * params : Promise<{ id: string }>
+ *     Identitas sesi.
+ *
+ * Returns
+ * -------
+ * Promise<NextResponse>
+ *     { token, coreUrl } bila berhasil; 401, 403, 404, atau 409 bila sesi tidak dapat diajukan.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Permintaan ditolak." }, { status: 403 });
   const user = await currentUser();

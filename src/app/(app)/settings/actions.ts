@@ -1,5 +1,8 @@
 "use server";
 
+/**
+ * Server action Pengaturan (khusus Technical Lead): mode analisis, penyedia LLM, uji koneksi, dan reset data contoh.
+ */
 import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
 import { getSettings, providerKeyConfigured, saveSettings, PROVIDER_LABEL } from "@/lib/settings";
@@ -16,6 +19,23 @@ export interface SettingsState {
 const PROVIDERS: ProviderId[] = ["anthropic", "openai", "gemini"];
 const ENV_NAME: Record<ProviderId, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY" };
 
+/**
+ * Menyimpan pengaturan Core Module.
+ *
+ * Mode LLM ditolak bila API key penyedia belum diatur di environment variable.
+ *
+ * Parameters
+ * ----------
+ * _ : SettingsState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     mode, provider, model, priceIn, priceOut, confidenceThreshold, samples, usdToIdr, simulateElkDown.
+ *
+ * Returns
+ * -------
+ * Promise<SettingsState>
+ *     Pesan berhasil atau galat validasi per field.
+ */
 export async function updateSettings(_: SettingsState, f: FormData): Promise<SettingsState> {
   const user = await requirePermission("settings.manage");
   const s = await getSettings();
@@ -58,7 +78,21 @@ export async function updateSettings(_: SettingsState, f: FormData): Promise<Set
   return { ok: mode === "llm" ? `Tersimpan. Analisis berikutnya memakai ${PROVIDER_LABEL[provider]} (${model}).` : "Tersimpan. Analisis berikutnya memakai mode demo." };
 }
 
-/** Menerbitkan token singkat; uji koneksi dijalankan oleh Core Module (Python, LangChain) di /api/py/uji-koneksi. */
+/**
+ * Menerbitkan token singkat untuk uji koneksi LLM oleh Core Module (/api/py/uji-koneksi).
+ *
+ * Parameters
+ * ----------
+ * provider : ProviderId
+ *     Penyedia LLM.
+ * model : string
+ *     Nama model.
+ *
+ * Returns
+ * -------
+ * Promise<{ ok: boolean; message?: string; token?: string }>
+ *     Token berlaku 1 menit, atau pesan bila penyedia tidak dikenal, API key kosong, atau nama model tidak valid.
+ */
 export async function testConnectionToken(provider: ProviderId, model: string): Promise<{ ok: boolean; message?: string; token?: string }> {
   await requirePermission("settings.manage");
   if (!PROVIDERS.includes(provider)) return { ok: false, message: "Penyedia tidak dikenal." };
@@ -67,6 +101,13 @@ export async function testConnectionToken(provider: ProviderId, model: string): 
   return { ok: true, token: await signCoreToken("uji-koneksi", { provider, model }, "1m") };
 }
 
+/**
+ * Menghapus seluruh data lalu mengisi ulang data contoh.
+ *
+ * Returns
+ * -------
+ * Promise<{ ok: boolean; message: string }>
+ */
 export async function resetDemoData(): Promise<{ ok: boolean; message: string }> {
   const user = await requirePermission("settings.manage");
   await resetAll();

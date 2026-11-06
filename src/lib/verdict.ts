@@ -1,3 +1,7 @@
+/**
+ * Label tampilan untuk enumerasi Tabel 9.30: verdict, status sesi, insiden, dokumen,
+ * permintaan, keputusan cycle, jalur penjurusan, dan sumber daya pembatas.
+ */
 import type { CycleDecision, IncidentStatus, Limiting, RequestStatus, Route, SessionStatus, SignoffStatus, Verdict } from "./types";
 
 export const VERDICT_LABEL: Record<Verdict, string> = {

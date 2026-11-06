@@ -1,3 +1,9 @@
+/**
+ * Komponen verdict dan hasil analisis: lencana, kartu verdict utama, runway kapasitas,
+ * tabel indikator per langkah, label jalur penjurusan, dan jejak keputusan.
+ *
+ * Empat verdict selalu tampil dengan warna, ikon, dan label yang sama di semua halaman.
+ */
 import { CircleCheck, CircleHelp, OctagonX, TriangleAlert } from "lucide-react";
 import type { AnalysisResult, AnalysisStep, Criteria, StepSummary, TraceEntry, Verdict } from "@/lib/types";
 import { LIMITING_LABEL, ROUTE_LABEL, VERDICT_HELP, VERDICT_LABEL } from "@/lib/verdict";
@@ -11,11 +17,39 @@ export const VERDICT_TONE: Record<Verdict, { text: string; bg: string; border: s
   TidakDapatDinilai: { text: "text-na", bg: "bg-na-soft", border: "border-na/40", varName: "--na" },
 };
 
+/**
+ * Ikon verdict yang berbeda bentuknya, agar tidak bergantung pada warna saja.
+ *
+ * Parameters
+ * ----------
+ * verdict : Verdict
+ *     Verdict yang ditampilkan.
+ * className : string, optional
+ *     Kelas ukuran dan warna.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function VerdictIcon({ verdict, className }: { verdict: Verdict; className?: string }) {
   const Icon = { Lolos: CircleCheck, LolosBersyarat: TriangleAlert, TidakLolos: OctagonX, TidakDapatDinilai: CircleHelp }[verdict];
   return <Icon className={className} aria-hidden />;
 }
 
+/**
+ * Lencana verdict dengan ikon, label, dan penjelasan pada title.
+ *
+ * Parameters
+ * ----------
+ * verdict : Verdict | null | undefined
+ *     Verdict; "Belum dianalisis" bila kosong.
+ * size : "sm" | "md", default "md"
+ *     Ukuran lencana.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function VerdictBadge({ verdict, size = "md" }: { verdict: Verdict | null | undefined; size?: "sm" | "md" }) {
   if (!verdict) return <span className="text-ink-3">–</span>;
   const t = VERDICT_TONE[verdict];
@@ -35,10 +69,37 @@ export function VerdictBadge({ verdict, size = "md" }: { verdict: Verdict | null
   );
 }
 
+/**
+ * Label pendek sebuah langkah untuk sumbu dan kolom tabel.
+ *
+ * Parameters
+ * ----------
+ * s : AnalysisStep
+ *     Langkah analisis.
+ *
+ * Returns
+ * -------
+ * string
+ *     Contoh "Puncak" atau "3× normal".
+ */
 const shortLabel = (s: AnalysisStep) =>
   s.kunci === "normal" ? "Normal" : s.kunci === "puncak" ? "Puncak" : s.kunci.startsWith("whatif") ? `${s.skenario?.pengali}× normal` : s.kunci === "insiden" ? "Insiden" : "Dampak";
 
-/** Lintasan kapasitas: posisi tiap skenario beban terhadap kapasitas transaksi maksimum (Little's Law). */
+/**
+ * Runway kapasitas: posisi setiap skenario beban terhadap kapasitas maksimum Little's Law.
+ *
+ * Parameters
+ * ----------
+ * steps : AnalysisStep[]
+ *     Langkah dengan skenario beban.
+ * maxTps : number | null
+ *     Kapasitas transaksi maksimum.
+ *
+ * Returns
+ * -------
+ * JSX.Element | null
+ *     null bila kapasitas tidak tersedia.
+ */
 export function CapacityRunway({ steps, maxTps }: { steps: AnalysisStep[]; maxTps: number | null }) {
   const sc = steps.filter((s) => s.skenario && s.ringkasan);
   const highest = Math.max(...sc.map((s) => s.skenario!.tpsTarget), maxTps ?? 0);
@@ -99,6 +160,22 @@ const ROWS: { key: keyof StepSummary; label: string; unit: string; limit?: (c: C
   { key: "throughputTps", label: "Throughput terlayani", unit: " TPS" },
 ];
 
+/**
+ * Tabel indikator sumber daya per langkah dengan bilah utilisasi dan batas kriteria.
+ *
+ * Parameters
+ * ----------
+ * steps : AnalysisStep[]
+ *     Langkah (kolom tabel).
+ * criteria : Criteria
+ *     Kriteria penerimaan; nilai yang melewati batas ditandai.
+ * useLabels : boolean, optional
+ *     Pakai deskripsi langkah sebagai judul kolom (untuk perbandingan opsi mitigasi).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function IndicatorTable({ steps, criteria, useLabels }: { steps: AnalysisStep[]; criteria: Criteria; useLabels?: boolean }) {
   const cols = steps.filter((s) => s.skenario || s.ringkasan);
   return (
@@ -166,6 +243,18 @@ export function IndicatorTable({ steps, criteria, useLabels }: { steps: Analysis
   );
 }
 
+/**
+ * Label jalur penjurusan (digital twin, estimasi penalaran, fallback, dan seterusnya).
+ *
+ * Parameters
+ * ----------
+ * route : string
+ *     Nilai jalur.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function RouteTag({ route }: { route: string }) {
   const tone =
     route === "EstimasiPenalaran"
@@ -180,6 +269,18 @@ export function RouteTag({ route }: { route: string }) {
   );
 }
 
+/**
+ * Daftar jejak keputusan agen beserta jalur, catatan, keyakinan, dan durasi.
+ *
+ * Parameters
+ * ----------
+ * trace : TraceEntry[]
+ *     Entri jejak keputusan.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function TraceList({ trace }: { trace: TraceEntry[] }) {
   return (
     <ol className="grid gap-0">
@@ -202,7 +303,21 @@ export function TraceList({ trace }: { trace: TraceEntry[] }) {
   );
 }
 
-/** Ringkasan untuk peran nonteknis (NFR-08): verdict, sumber daya pembatas, dan narasi tampil lebih dulu. */
+/**
+ * Kartu verdict utama: verdict, sumber daya pembatas, narasi, penyebab bottleneck, alasan,
+ * syarat, serta versi dan tanggal kalibrasi model (NFR-02, NFR-08).
+ *
+ * Parameters
+ * ----------
+ * result : AnalysisResult
+ *     Hasil Core Module.
+ * title : string, default "Verdict Core Module"
+ *     Keterangan di atas verdict, misalnya status reproduksi insiden.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function VerdictHero({ result, title = "Verdict Core Module" }: { result: AnalysisResult; title?: string }) {
   const v = result.verdict;
   const t = VERDICT_TONE[v.status];

@@ -1,4 +1,9 @@
-// Tipe domain mengikuti structural model (Bab 9) dan enumerasi Tabel 9.30 dokumen AKPSI Kelompok C6.
+/**
+ * Tipe domain mengikuti structural model (Bab 9) dan enumerasi Tabel 9.30 dokumen AKPSI Kelompok C6.
+ *
+ * Nama field hasil Core Module (AnalysisResult dan turunannya) sengaja sama dengan keluaran
+ * Python agar JSON dapat dipakai langsung tanpa pemetaan.
+ */
 
 export type Role = "TL" | "QA" | "IE" | "PM" | "SUP";
 

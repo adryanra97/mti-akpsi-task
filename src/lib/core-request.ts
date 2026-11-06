@@ -1,12 +1,36 @@
 import "server-only";
+/**
+ * Pintu masuk tunggal ke Core Module (PermintaanAnalisis.ajukan(), Subbab 9.2.1).
+ *
+ * Dashboard menandatangani paket masukan sebagai JWT; Core Module Python memverifikasinya,
+ * menjalankan analisis, lalu menandatangani hasil dengan HMAC-SHA256 yang diverifikasi di sini.
+ */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { SignJWT } from "jose";
 import { secret } from "./session";
 import type { AlignmentSession, AnalysisResult, AppSettings, Incident, MitigationChanges } from "./types";
 
 /**
- * Pintu masuk tunggal ke Core Module (PermintaanAnalisis.ajukan(), Subbab 9.2.1).
- * Dashboard menandatangani paket masukan; Core Module Python memverifikasinya, lalu menandatangani hasil.
+ * Menandatangani token permintaan untuk Core Module.
+ *
+ * Parameters
+ * ----------
+ * tujuan : "analisis" | "uji-koneksi"
+ *     Endpoint tujuan; dicek Core Module agar token tidak dipakai di endpoint lain.
+ * claims : Record<string, unknown>
+ *     Isi permintaan, misalnya PermintaanAnalisis atau penyedia dan model untuk uji koneksi.
+ * ttl : string, default "10m"
+ *     Masa berlaku token dalam format `jose`, misalnya "1m".
+ *
+ * Returns
+ * -------
+ * Promise<string>
+ *     JWT HS256 dengan audiens "serveragent-core".
+ *
+ * Raises
+ * ------
+ * Error
+ *     Bila `AUTH_SECRET` belum diatur.
  */
 export async function signCoreToken(tujuan: "analisis" | "uji-koneksi", claims: Record<string, unknown>, ttl = "10m") {
   const key = secret();
@@ -19,7 +43,21 @@ export async function signCoreToken(tujuan: "analisis" | "uji-koneksi", claims: 
     .sign(key);
 }
 
-/** Memastikan hasil berasal dari Core Module dan tidak diubah di perjalanan. */
+/**
+ * Memverifikasi hasil dari Core Module lalu mem-parsing-nya.
+ *
+ * Parameters
+ * ----------
+ * text : string
+ *     HasilAnalisis dalam bentuk string JSON, persis seperti yang ditandatangani.
+ * signature : string
+ *     Tanda HMAC-SHA256 dalam heksadesimal (64 karakter).
+ *
+ * Returns
+ * -------
+ * AnalysisResult | null
+ *     Hasil yang sah, atau null bila tanda tidak cocok atau JSON tidak valid.
+ */
 export function verifyCoreResult(text: string, signature: string): AnalysisResult | null {
   const key = secret();
   if (!key || typeof text !== "string" || typeof signature !== "string" || !/^[0-9a-f]{64}$/.test(signature)) return null;
@@ -33,6 +71,22 @@ export function verifyCoreResult(text: string, signature: string): AnalysisResul
   }
 }
 
+/**
+ * Bagian pengaturan pada PermintaanAnalisis.
+ *
+ * Parameters
+ * ----------
+ * s : AppSettings
+ *     Pengaturan aplikasi.
+ * service : string
+ *     Nama layanan, untuk mengambil baseline tersimpan terakhir.
+ *
+ * Returns
+ * -------
+ * Record<string, unknown>
+ *     Mode, penyedia, model, harga, kurs, ambang keyakinan, jumlah sampel, simulasi ELK
+ *     tidak tersedia, dan baseline tersimpan.
+ */
 function settingsClaims(s: AppSettings, service: string) {
   return {
     mode: s.mode,
@@ -47,6 +101,23 @@ function settingsClaims(s: AppSettings, service: string) {
   };
 }
 
+/**
+ * Membentuk PermintaanAnalisis mode Alignment.
+ *
+ * Parameters
+ * ----------
+ * session : AlignmentSession
+ *     Sesi dengan parameter analisis tersimpan.
+ * settings : AppSettings
+ *     Pengaturan aplikasi.
+ * id : string
+ *     Identitas permintaan.
+ *
+ * Returns
+ * -------
+ * Record<string, unknown>
+ *     Paket permintaan untuk ditandatangani.
+ */
 export function alignmentRequest(session: AlignmentSession, settings: AppSettings, id: string) {
   return {
     idPermintaan: id,
@@ -60,6 +131,25 @@ export function alignmentRequest(session: AlignmentSession, settings: AppSetting
   };
 }
 
+/**
+ * Membentuk PermintaanAnalisis mode ReproduksiInsiden atau Mitigasi.
+ *
+ * Parameters
+ * ----------
+ * inc : Incident
+ *     Kasus insiden.
+ * settings : AppSettings
+ *     Pengaturan aplikasi.
+ * id : string
+ *     Identitas permintaan.
+ * mitigation : { label: string; changes: MitigationChanges }, optional
+ *     Opsi mitigasi yang dinilai; tanpa ini permintaan berupa reproduksi insiden.
+ *
+ * Returns
+ * -------
+ * Record<string, unknown>
+ *     Paket permintaan untuk ditandatangani.
+ */
 export function incidentRequest(
   inc: Incident,
   settings: AppSettings,

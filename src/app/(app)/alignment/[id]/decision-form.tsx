@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Formulir keputusan cycle untuk Technical Lead.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useState } from "react";
 import { LoaderCircle, Lock } from "lucide-react";
@@ -7,6 +10,22 @@ import { decideCycle, type FormState } from "../actions";
 import { Button, Field, Textarea, cx } from "@/components/ui";
 import type { Verdict } from "@/lib/types";
 
+/**
+ * Pilihan Lanjut Promosi atau Kembali ke Dev, ringkasan, tindak lanjut, dan konfirmasi.
+ *
+ * Parameters
+ * ----------
+ * sessionId : string
+ *     Identitas sesi.
+ * verdict : Verdict
+ *     Verdict terbaru; Tidak Lolos dan Tidak Dapat Dinilai menonaktifkan pilihan promosi.
+ * defaultFollowUps : string
+ *     Isian awal tindak lanjut (syarat verdict, satu per baris).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function DecisionForm({ sessionId, verdict, defaultFollowUps }: { sessionId: string; verdict: Verdict; defaultFollowUps: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(decideCycle.bind(null, sessionId), {});
   const blocked = verdict === "TidakLolos" || verdict === "TidakDapatDinilai";

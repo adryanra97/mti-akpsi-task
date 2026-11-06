@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * Alat interaktif insiden: pengajuan reproduksi, penilaian opsi mitigasi, eskalasi,
+ * penyusunan laporan, dan salin ringkasan.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -10,6 +14,20 @@ import { VerdictBadge } from "@/components/verdict";
 import { finalizeIncident, markAllTested, type IncFormState } from "../actions";
 import type { Mitigation, Spec } from "@/lib/types";
 
+/**
+ * Tombol dan progres pengajuan reproduksi insiden ke Core Module.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas insiden.
+ * retry : boolean, optional
+ *     Tampilkan sebagai pengajuan ulang (status Dalam Reproduksi).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function ReproRunner({ id, retry }: { id: string; retry?: boolean }) {
   const router = useRouter();
   const run = useCoreRun();
@@ -41,6 +59,22 @@ const FIELDS: { key: keyof Spec; label: string }[] = [
   { key: "timeoutMs", label: "Timeout (ms)" },
 ];
 
+/**
+ * Formulir opsi mitigasi: ubah spesifikasi lalu ajukan penilaian ke Core Module.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas insiden.
+ * spec : Spec
+ *     Spesifikasi saat ini, sebagai nilai awal dan pembanding.
+ * count : number
+ *     Jumlah opsi yang sudah diuji, untuk nama opsi bawaan.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function MitigationLab({ id, spec, count }: { id: string; spec: Spec; count: number }) {
   const router = useRouter();
   const run = useCoreRun();
@@ -49,6 +83,18 @@ export function MitigationLab({ id, spec, count }: { id: string; spec: Spec; cou
   const current = (k: keyof Spec) => (k === "timeoutMs" ? spec.timeoutMs ?? 3000 : spec[k]);
   const changed = Object.entries(vals).filter(([k, v]) => v !== "" && Number(v) !== current(k as keyof Spec));
 
+  /**
+   * Mengajukan penilaian opsi mitigasi berisi nilai yang berubah saja.
+   *
+   * Parameters
+   * ----------
+   * ev : React.FormEvent
+   *     Event submit formulir.
+   *
+   * Returns
+   * -------
+   * Promise<void>
+   */
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
     const changes = Object.fromEntries(changed.map(([k, v]) => [k, Number(v)]));
@@ -96,6 +142,18 @@ export function MitigationLab({ id, spec, count }: { id: string; spec: Spec; cou
   );
 }
 
+/**
+ * Tombol menutup pengujian opsi dan menandai perlu eskalasi.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas insiden.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function AllTestedButton({ id }: { id: string }) {
   const [pending, start] = useTransition();
   return (
@@ -106,6 +164,22 @@ export function AllTestedButton({ id }: { id: string }) {
   );
 }
 
+/**
+ * Formulir memilih mitigasi yang direkomendasikan lalu menyusun laporan insiden.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas insiden.
+ * mitigations : Mitigation[]
+ *     Opsi yang sudah dinilai; opsi Lolos dipilih lebih dulu.
+ * notReproduced : boolean
+ *     Insiden belum tereproduksi; laporan disusun tanpa memilih mitigasi.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function FinalizeForm({ id, mitigations, notReproduced }: { id: string; mitigations: Mitigation[]; notReproduced: boolean }) {
   const [state, action, pending] = useActionState<IncFormState, FormData>(finalizeIncident.bind(null, id), {});
   const best = mitigations.find((m) => m.result.verdict.status === "Lolos") ?? mitigations.find((m) => m.result.verdict.status === "LolosBersyarat");
@@ -141,6 +215,18 @@ export function FinalizeForm({ id, mitigations, notReproduced }: { id: string; m
   );
 }
 
+/**
+ * Tombol menyalin ringkasan laporan ke clipboard.
+ *
+ * Parameters
+ * ----------
+ * text : string
+ *     Ringkasan yang disalin.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function CopySummary({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (

@@ -1,5 +1,8 @@
 "use server";
 
+/**
+ * Server action masuk dan keluar.
+ */
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { USERS } from "@/lib/roles";
@@ -14,6 +17,24 @@ export interface LoginState {
 
 const GENERIC = "Kata sandi tidak cocok untuk peran ini. Periksa lalu coba lagi.";
 
+/**
+ * Memverifikasi peran dan kata sandi lalu menerbitkan cookie sesi.
+ *
+ * Galat dibuat seragam agar tidak membocorkan informasi, percobaan gagal dibatasi per IP dan
+ * nama pengguna, dan tujuan pengalihan hanya boleh path internal.
+ *
+ * Parameters
+ * ----------
+ * _ : LoginState
+ *     State sebelumnya (tidak dipakai).
+ * form : FormData
+ *     username (dari pilihan peran), password, dan next.
+ *
+ * Returns
+ * -------
+ * Promise<LoginState>
+ *     Pesan galat; bila berhasil, dialihkan ke halaman tujuan.
+ */
 export async function login(_: LoginState, form: FormData): Promise<LoginState> {
   const username = String(form.get("username") ?? "").trim().toLowerCase().slice(0, 64);
   const password = String(form.get("password") ?? "").slice(0, 256);
@@ -55,6 +76,13 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   redirect(next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/");
 }
 
+/**
+ * Menghapus cookie sesi lalu mengalihkan ke halaman masuk.
+ *
+ * Returns
+ * -------
+ * Promise<never>
+ */
 export async function logout() {
   const jar = await cookies();
   jar.delete(COOKIE);

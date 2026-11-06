@@ -1,7 +1,23 @@
+/**
+ * Middleware Next.js: Content-Security-Policy berbasis nonce, pemeriksaan sesi, dan akses halaman per peran.
+ */
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE, verifySession } from "@/lib/session";
 import { SECTION_ACCESS, sectionForPath } from "@/lib/roles";
 
+/**
+ * Menyusun Content-Security-Policy untuk satu permintaan.
+ *
+ * Parameters
+ * ----------
+ * nonce : string
+ *     Nonce acak per permintaan untuk script yang diizinkan.
+ *
+ * Returns
+ * -------
+ * string
+ *     Nilai header CSP; mode pengembangan menambahkan 'unsafe-eval' untuk hot reload.
+ */
 function csp(nonce: string) {
   const dev = process.env.NODE_ENV !== "production";
   return [
@@ -19,6 +35,23 @@ function csp(nonce: string) {
   ].join("; ");
 }
 
+/**
+ * Memeriksa sesi dan hak akses sebelum halaman atau API diproses.
+ *
+ * Pengguna tanpa sesi dialihkan ke /login (API menjawab 401); pengguna yang sudah login
+ * dialihkan dari /login ke beranda; halaman di luar akses peran dialihkan ke beranda
+ * dengan pemberitahuan.
+ *
+ * Parameters
+ * ----------
+ * req : NextRequest
+ *     Permintaan masuk.
+ *
+ * Returns
+ * -------
+ * Promise<NextResponse>
+ *     Respons lanjutan (dengan header CSP dan x-nonce), pengalihan, atau 401.
+ */
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const nonce = btoa(crypto.randomUUID());

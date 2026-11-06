@@ -1,3 +1,6 @@
+/**
+ * Halaman pembukaan kasus insiden baru.
+ */
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -8,6 +11,13 @@ import { IncidentForm } from "./incident-form";
 
 export const metadata: Metadata = { title: "Buka kasus insiden" };
 
+/**
+ * Halaman kasus insiden baru.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function NewIncident() {
   const user = await requireUser();
   if (!can(user.role, "incident.manage")) redirect("/incidents");

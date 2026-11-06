@@ -1,3 +1,7 @@
+/**
+ * Rincian hasil analisis di bawah kartu verdict: peringatan, verifikasi manual, indikator,
+ * trajektori, capacity planning, baseline, rencana uji, kalibrasi, biaya, dan jejak keputusan.
+ */
 import type { AnalysisResult, StepSummary } from "@/lib/types";
 import { KeyValue, Notice, Panel } from "./ui";
 import { CapacityRunway, IndicatorTable, TraceList } from "./verdict";
@@ -6,6 +10,18 @@ import { fmtDate, fmtIdr, fmtNum } from "@/lib/format";
 import { LIMITING_LABEL } from "@/lib/verdict";
 import { peakSummary } from "@/lib/domain";
 
+/**
+ * Perbandingan metrik baseline Production dengan hasil simulasi beban puncak.
+ *
+ * Parameters
+ * ----------
+ * r : AnalysisResult
+ *     Hasil Core Module.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function BaselineVsSim({ r }: { r: AnalysisResult }) {
   const b = r.metrikBaseline;
   const s = peakSummary(r) as StepSummary | null;
@@ -43,6 +59,20 @@ function BaselineVsSim({ r }: { r: AnalysisResult }) {
   );
 }
 
+/**
+ * Rincian lengkap satu hasil analisis.
+ *
+ * Parameters
+ * ----------
+ * r : AnalysisResult
+ *     Hasil Core Module.
+ * showRunway : boolean, default true
+ *     Tampilkan runway kapasitas (disembunyikan pada reproduksi insiden).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function ResultDetails({ r, showRunway = true }: { r: AnalysisResult; showRunway?: boolean }) {
   const manual = r.langkah.filter((l) => l.perluVerifikasiManual);
   const stopped = r.statusPermintaan === "Selesai" && r.alasanDihentikan;

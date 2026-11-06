@@ -1,3 +1,6 @@
+/**
+ * Halaman daftar kasus insiden (terbuka dan terdokumentasi).
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
@@ -13,6 +16,18 @@ import type { Incident } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Respons insiden" };
 
+/**
+ * Warna tag untuk status insiden.
+ *
+ * Parameters
+ * ----------
+ * i : Incident
+ *     Kasus insiden; kasus yang perlu eskalasi selalu merah.
+ *
+ * Returns
+ * -------
+ * "neutral" | "accent" | "warn" | "pass" | "fail"
+ */
 function statusTone(i: Incident): "warn" | "accent" | "pass" | "neutral" | "fail" {
   if (i.status === "PerluEskalasi" || i.needsEscalation) return "fail";
   if (i.status === "Terdokumentasi") return "pass";
@@ -21,6 +36,13 @@ function statusTone(i: Incident): "warn" | "accent" | "pass" | "neutral" | "fail
   return "accent";
 }
 
+/**
+ * Halaman daftar kasus insiden.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function Incidents() {
   const user = await requireUser();
   const list = (await listIncidents()).sort((a, b) => b.data.detectedAt.localeCompare(a.data.detectedAt));

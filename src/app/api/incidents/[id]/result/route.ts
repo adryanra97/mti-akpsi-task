@@ -1,3 +1,6 @@
+/**
+ * API penerimaan hasil reproduksi dan penilaian mitigasi dari Core Module.
+ */
 import { NextResponse } from "next/server";
 import { audit, currentUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
@@ -10,7 +13,24 @@ import { sameOrigin } from "@/lib/stream";
 
 export const dynamic = "force-dynamic";
 
-/** terimaHasilReproduksi(hasil) atau terimaVerdictOpsi(v), sesuai state machine KasusInsiden (Gambar 10.18). */
+/**
+ * terimaHasilReproduksi(hasil) atau terimaVerdictOpsi(v), sesuai state machine KasusInsiden (Gambar 10.18).
+ *
+ * Reproduksi: Dalam Reproduksi -> Tereproduksi atau Belum Tereproduksi. Mitigasi: opsi ditambahkan,
+ * dan verdict Lolos membawa kasus ke Mitigasi Ditemukan.
+ *
+ * Parameters
+ * ----------
+ * req : Request
+ *     Body JSON { hasil: string, tanda: string }.
+ * params : Promise<{ id: string }>
+ *     Identitas insiden.
+ *
+ * Returns
+ * -------
+ * Promise<NextResponse>
+ *     { ok: true } bila tersimpan; galat bila tanda tidak sah atau status tidak sesuai.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Permintaan ditolak." }, { status: 403 });
   const user = await currentUser();

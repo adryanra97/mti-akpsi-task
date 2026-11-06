@@ -1,3 +1,7 @@
+/**
+ * Komponen antarmuka dasar: tombol, panel, kepala halaman, isian formulir, tag, pemberitahuan,
+ * keadaan kosong, dan daftar label-nilai. Seluruh warna memakai token tema (terang dan gelap).
+ */
 import clsx from "clsx";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
@@ -15,6 +19,22 @@ const btnVariants: Record<BtnVariant, string> = {
   danger: "bg-fail text-white hover:opacity-90 dark:text-bg",
 };
 
+/**
+ * Tombol dengan varian gaya.
+ *
+ * Parameters
+ * ----------
+ * variant : "primary" | "secondary" | "ghost" | "danger", default "primary"
+ *     Gaya tombol; "primary" untuk tindakan utama di setiap layar.
+ * className : string, optional
+ *     Kelas tambahan.
+ * ...props : ComponentProps<"button">
+ *     Atribut tombol HTML lainnya.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Button({
   variant = "primary",
   className,
@@ -23,6 +43,22 @@ export function Button({
   return <button className={clsx(btnBase, btnVariants[variant], className)} {...props} />;
 }
 
+/**
+ * Tautan Next.js bergaya tombol, untuk navigasi yang tampil sebagai tindakan.
+ *
+ * Parameters
+ * ----------
+ * variant : "primary" | "secondary" | "ghost" | "danger", default "primary"
+ *     Gaya tombol.
+ * className : string, optional
+ *     Kelas tambahan.
+ * ...props : ComponentProps<typeof Link>
+ *     Atribut tautan (href wajib).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function ButtonLink({
   variant = "primary",
   className,
@@ -31,6 +67,30 @@ export function ButtonLink({
   return <Link className={clsx(btnBase, btnVariants[variant], className)} {...props} />;
 }
 
+/**
+ * Kartu berbingkai dengan kepala (judul, deskripsi, aksi) dan isi.
+ *
+ * Parameters
+ * ----------
+ * title : ReactNode, optional
+ *     Judul panel (h2).
+ * description : ReactNode, optional
+ *     Keterangan singkat di bawah judul.
+ * actions : ReactNode, optional
+ *     Tombol di sisi kanan kepala.
+ * children : ReactNode
+ *     Isi panel.
+ * className : string, optional
+ *     Kelas tambahan untuk bingkai.
+ * bodyClassName : string, optional
+ *     Kelas isi; bawaan berpadding.
+ * id : string, optional
+ *     Id elemen, misalnya untuk tautan jangkar.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Panel({
   title,
   description,
@@ -64,6 +124,24 @@ export function Panel({
   );
 }
 
+/**
+ * Kepala halaman: tautan kembali, judul (h1), deskripsi, dan aksi.
+ *
+ * Parameters
+ * ----------
+ * title : ReactNode
+ *     Judul halaman.
+ * description : ReactNode, optional
+ *     Konteks singkat di bawah judul.
+ * actions : ReactNode, optional
+ *     Tag status atau tombol di sisi kanan.
+ * back : { href: string; label: string }, optional
+ *     Tautan kembali ke halaman induk.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function PageHeader({
   title,
   description,
@@ -93,6 +171,28 @@ export function PageHeader({
   );
 }
 
+/**
+ * Pembungkus isian formulir dengan label, petunjuk, dan pesan galat yang terhubung lewat aria.
+ *
+ * Parameters
+ * ----------
+ * label : string
+ *     Label isian.
+ * htmlFor : string
+ *     Id isian; petunjuk memakai id "{htmlFor}-hint" dan galat "{htmlFor}-error".
+ * hint : string, optional
+ *     Petunjuk singkat (contoh rentang nilai).
+ * error : string, optional
+ *     Pesan galat validasi; menggantikan tampilan petunjuk.
+ * children : ReactNode
+ *     Elemen isian.
+ * className : string, optional
+ *     Kelas tambahan.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Field({
   label,
   htmlFor,
@@ -130,18 +230,74 @@ export function Field({
 export const inputClass =
   "block w-full rounded-lg border border-line-strong bg-surface px-3 h-10 text-[14.5px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-fail aria-[invalid=true]:ring-fail/20";
 
+/**
+ * Isian teks bergaya standar.
+ *
+ * Parameters
+ * ----------
+ * className : string, optional
+ *     Kelas tambahan.
+ * ...props : ComponentProps<"input">
+ *     Atribut input HTML, termasuk ref.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={clsx(inputClass, className)} {...props} />;
 }
 
+/**
+ * Isian teks multi-baris bergaya standar.
+ *
+ * Parameters
+ * ----------
+ * className : string, optional
+ *     Kelas tambahan.
+ * ...props : ComponentProps<"textarea">
+ *     Atribut textarea HTML.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return <textarea className={clsx(inputClass, "h-auto py-2 leading-relaxed", className)} {...props} />;
 }
 
+/**
+ * Daftar pilihan bergaya standar.
+ *
+ * Parameters
+ * ----------
+ * className : string, optional
+ *     Kelas tambahan.
+ * ...props : ComponentProps<"select">
+ *     Atribut select HTML beserta option sebagai children.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Select({ className, ...props }: ComponentProps<"select">) {
   return <select className={clsx(inputClass, "pr-8", className)} {...props} />;
 }
 
+/**
+ * Label status kecil berwarna.
+ *
+ * Parameters
+ * ----------
+ * children : ReactNode
+ *     Isi label.
+ * tone : "neutral" | "accent" | "warn" | "pass" | "fail", default "neutral"
+ *     Warna semantik.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "accent" | "warn" | "pass" | "fail" }) {
   const tones = {
     neutral: "bg-sunken text-ink-2",
@@ -153,6 +309,22 @@ export function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?
   return <span className={clsx("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12.5px] font-medium", tones[tone])}>{children}</span>;
 }
 
+/**
+ * Keadaan kosong yang menjelaskan apa yang terjadi dan langkah berikutnya.
+ *
+ * Parameters
+ * ----------
+ * title : string
+ *     Ringkasan keadaan.
+ * children : ReactNode, optional
+ *     Penjelasan.
+ * action : ReactNode, optional
+ *     Tombol tindakan lanjutan.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="rounded-xl border border-dashed border-line-strong px-6 py-10 text-center">
@@ -163,6 +335,24 @@ export function EmptyState({ title, children, action }: { title: string; childre
   );
 }
 
+/**
+ * Kotak pemberitahuan berwarna sesuai nada pesan.
+ *
+ * Parameters
+ * ----------
+ * tone : "info" | "warn" | "fail" | "pass", default "info"
+ *     Nada pesan.
+ * title : ReactNode, optional
+ *     Judul pemberitahuan.
+ * children : ReactNode, optional
+ *     Isi pemberitahuan.
+ * icon : ReactNode, optional
+ *     Ikon di sisi kiri.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Notice({
   tone = "info",
   title,
@@ -191,6 +381,20 @@ export function Notice({
   );
 }
 
+/**
+ * Daftar pasangan label dan nilai (elemen dl).
+ *
+ * Parameters
+ * ----------
+ * items : [ReactNode, ReactNode][]
+ *     Pasangan label dan nilai.
+ * className : string, optional
+ *     Kelas tambahan.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function KeyValue({ items, className }: { items: [ReactNode, ReactNode][]; className?: string }) {
   return (
     <dl className={clsx("grid grid-cols-[minmax(120px,auto)_1fr] gap-x-4 gap-y-2 text-[14px]", className)}>

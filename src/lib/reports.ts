@@ -1,3 +1,6 @@
+/**
+ * Filter daftar laporan dan konversinya dari dan ke query string URL.
+ */
 import type { ReportEntry, ReportKind } from "./types";
 
 export interface ReportFilter {
@@ -14,6 +17,21 @@ export const KIND_LABEL: Record<ReportKind, string> = {
   insiden: "Laporan insiden",
 };
 
+/**
+ * Menyaring daftar laporan.
+ *
+ * Parameters
+ * ----------
+ * list : ReportEntry[]
+ *     Seluruh laporan.
+ * f : ReportFilter
+ *     Filter jenis, layanan, rilis, dan rentang tanggal (YYYY-MM-DD, inklusif).
+ *
+ * Returns
+ * -------
+ * ReportEntry[]
+ *     Laporan yang cocok.
+ */
 export function applyFilter(list: ReportEntry[], f: ReportFilter) {
   return list.filter((r) => {
     if (f.kind && r.kind !== f.kind) return false;
@@ -26,6 +44,19 @@ export function applyFilter(list: ReportEntry[], f: ReportFilter) {
   });
 }
 
+/**
+ * Membaca filter laporan dari parameter URL.
+ *
+ * Parameters
+ * ----------
+ * sp : Record<string, string | undefined>
+ *     Parameter pencarian: jenis, layanan, rilis, dari, sampai.
+ *
+ * Returns
+ * -------
+ * ReportFilter
+ *     Filter yang sudah divalidasi; jenis tidak dikenal diabaikan.
+ */
 export function filterFromParams(sp: Record<string, string | undefined>): ReportFilter {
   const kind = sp.jenis as ReportKind | undefined;
   return {
@@ -37,6 +68,19 @@ export function filterFromParams(sp: Record<string, string | undefined>): Report
   };
 }
 
+/**
+ * Mengubah filter laporan menjadi query string.
+ *
+ * Parameters
+ * ----------
+ * f : ReportFilter
+ *     Filter laporan.
+ *
+ * Returns
+ * -------
+ * string
+ *     Query string tanpa tanda tanya, hanya berisi filter yang terisi.
+ */
 export function filterToQuery(f: ReportFilter) {
   const q = new URLSearchParams();
   if (f.kind) q.set("jenis", f.kind);

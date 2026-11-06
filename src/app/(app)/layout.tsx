@@ -1,3 +1,6 @@
+/**
+ * Tata letak halaman setelah login: navigasi samping, banner status database, dan area isi.
+ */
 import { Database } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { requireUser } from "@/lib/auth";
@@ -7,6 +10,18 @@ import { getSettings, PROVIDER_LABEL } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Tata letak bersama seluruh halaman aplikasi.
+ *
+ * Parameters
+ * ----------
+ * children : ReactNode
+ *     Isi halaman.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const [badges, kind, settings] = await Promise.all([navBadges(user.role), dbKind(), getSettings()]);

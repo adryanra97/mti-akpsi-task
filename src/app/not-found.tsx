@@ -1,5 +1,15 @@
+/**
+ * Halaman 404.
+ */
 import Link from "next/link";
 
+/**
+ * Pesan halaman tidak ditemukan beserta tautan ke beranda.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export default function NotFound() {
   return (
     <main className="mx-auto max-w-lg px-4 py-24 text-center">

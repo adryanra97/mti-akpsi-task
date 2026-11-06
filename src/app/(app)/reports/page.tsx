@@ -1,3 +1,6 @@
+/**
+ * Halaman UC-03 Unduh Laporan dan Riwayat: filter, ringkasan tren, daftar laporan, unduhan, dan log audit.
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download, FileSpreadsheet, Lock } from "lucide-react";
@@ -17,6 +20,18 @@ export const metadata: Metadata = { title: "Report" };
 
 const dlLink = "inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong px-2.5 text-[13px] font-medium hover:bg-surface-2";
 
+/**
+ * Halaman Report.
+ *
+ * Parameters
+ * ----------
+ * searchParams : Promise<Record<string, string | undefined>>
+ *     Filter: jenis, layanan, rilis, dari, sampai.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function Reports({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
   const sp = await searchParams;

@@ -1,3 +1,6 @@
+/**
+ * API unduhan laporan (PDF per laporan dan CSV riwayat) dengan pemeriksaan hak akses dan log audit.
+ */
 import { NextResponse } from "next/server";
 import { audit, currentUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
@@ -9,6 +12,19 @@ import type { ReportEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Mengunduh satu laporan sebagai PDF/CSV, atau seluruh riwayat terfilter sebagai CSV.
+ *
+ * Parameters
+ * ----------
+ * req : Request
+ *     Query: format ("pdf" atau "csv"), id (opsional), dan filter laporan.
+ *
+ * Returns
+ * -------
+ * Promise<NextResponse>
+ *     Berkas dengan Content-Disposition attachment; 401 atau 403 bila tidak berhak.
+ */
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sesi berakhir. Masuk kembali." }, { status: 401 });

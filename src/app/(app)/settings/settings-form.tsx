@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Formulir pengaturan Core Module, uji koneksi LLM, dan reset data contoh.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useState, useTransition } from "react";
 import { CircleCheck, CircleX, KeyRound, LoaderCircle, PlugZap, RotateCcw } from "lucide-react";
@@ -7,6 +10,21 @@ import { resetDemoData, testConnectionToken, updateSettings, type SettingsState 
 import { Button, Field, Input, Notice, Panel, cx } from "@/components/ui";
 import type { AppSettings, ProviderId } from "@/lib/types";
 
+/**
+ * Menjalankan uji koneksi: minta token ke server, lalu panggil Core Module Python.
+ *
+ * Parameters
+ * ----------
+ * provider : ProviderId
+ *     Penyedia LLM.
+ * model : string
+ *     Nama model.
+ *
+ * Returns
+ * -------
+ * Promise<{ ok: boolean; message: string }>
+ *     Hasil uji dan pesan untuk ditampilkan.
+ */
 async function runConnectionTest(provider: ProviderId, model: string): Promise<{ ok: boolean; message: string }> {
   const t = await testConnectionToken(provider, model);
   if (!t.ok || !t.token) return { ok: false, message: t.message ?? "Gagal menyiapkan uji koneksi." };
@@ -20,6 +38,24 @@ async function runConnectionTest(provider: ProviderId, model: string): Promise<{
   }
 }
 
+/**
+ * Formulir mode analisis, penyedia dan model LLM, harga, serta parameter Core Module.
+ *
+ * Parameters
+ * ----------
+ * settings : AppSettings
+ *     Pengaturan saat ini.
+ * keys : Record<ProviderId, boolean>
+ *     Status API key per penyedia (tanpa nilai key).
+ * labels : Record<ProviderId, string>
+ *     Nama tampilan penyedia.
+ * suggestions : Record<ProviderId, string[]>
+ *     Saran nama model per penyedia.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function SettingsForm({
   settings,
   keys,
@@ -175,6 +211,13 @@ export function SettingsForm({
   );
 }
 
+/**
+ * Tombol reset data contoh dengan konfirmasi.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function ResetData() {
   const [confirm, setConfirm] = useState(false);
   const [pending, start] = useTransition();

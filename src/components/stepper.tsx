@@ -1,7 +1,23 @@
+/**
+ * Penunjuk tahapan alur use case.
+ */
 import { Check } from "lucide-react";
 import { cx } from "./ui";
 
-/** Penunjuk posisi dalam alur use case, agar pengguna tahu langkah yang sudah dan belum dilalui. */
+/**
+ * Menunjukkan langkah yang sudah, sedang, dan belum dilalui.
+ *
+ * Parameters
+ * ----------
+ * steps : { label: string; detail?: string }[]
+ *     Tahapan beserta pelakunya.
+ * current : number
+ *     Indeks tahap aktif; nilai sama dengan panjang steps berarti semua selesai.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function Stepper({ steps, current }: { steps: { label: string; detail?: string }[]; current: number }) {
   return (
     <nav aria-label="Tahapan alur">

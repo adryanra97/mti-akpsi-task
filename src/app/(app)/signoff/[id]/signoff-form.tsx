@@ -1,11 +1,26 @@
 "use client";
 
+/**
+ * Formulir keputusan sign-off untuk Project/Technical Manager.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useState } from "react";
 import { LoaderCircle, Lock } from "lucide-react";
 import { decideSignoff, type SoState } from "../actions";
 import { Button, Field, Textarea, cx } from "@/components/ui";
 
+/**
+ * Pilihan setujui atau tolak, catatan, dan konfirmasi sebelum dokumen dikunci.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas dokumen.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function SignoffForm({ id }: { id: string }) {
   const [state, action, pending] = useActionState<SoState, FormData>(decideSignoff.bind(null, id), {});
   const [decision, setDecision] = useState(state.values?.decision ?? "");

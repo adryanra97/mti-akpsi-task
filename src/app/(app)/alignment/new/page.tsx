@@ -1,3 +1,6 @@
+/**
+ * Halaman penjadwalan sesi alignment baru (khusus Technical Lead).
+ */
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -9,6 +12,13 @@ import { SERVICES } from "@/lib/services";
 
 export const metadata: Metadata = { title: "Jadwalkan sesi alignment" };
 
+/**
+ * Halaman penjadwalan sesi alignment.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function NewSession() {
   const user = await requireUser();
   if (!can(user.role, "alignment.schedule")) redirect("/alignment");

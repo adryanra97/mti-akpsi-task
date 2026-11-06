@@ -1,10 +1,25 @@
 "use client";
 
+/**
+ * Tombol untuk membuka sesi terjadwal lebih awal.
+ */
 import { useTransition } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui";
 import { openSession } from "../actions";
 
+/**
+ * Membuka sesi (Terjadwal -> Pengisian Parameter) tanpa menunggu jadwal.
+ *
+ * Parameters
+ * ----------
+ * id : string
+ *     Identitas sesi.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function OpenSessionButton({ id }: { id: string }) {
   const [pending, start] = useTransition();
   return (

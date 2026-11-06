@@ -1,3 +1,6 @@
+/**
+ * API penerimaan hasil analisis alignment dari Core Module.
+ */
 import { NextResponse } from "next/server";
 import { audit, currentUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
@@ -10,7 +13,24 @@ import { sameOrigin } from "@/lib/stream";
 
 export const dynamic = "force-dynamic";
 
-/** terimaHasil(hasil): Menunggu Hasil -> Peninjauan. Hasil hanya diterima bila tanda tangan Core Module sah. */
+/**
+ * terimaHasil(hasil): Menunggu Hasil -> Peninjauan.
+ *
+ * Hasil hanya diterima bila tanda HMAC Core Module sah dan id permintaan cocok; baseline
+ * terbaru disimpan sebagai cadangan bila ELK tidak tersedia.
+ *
+ * Parameters
+ * ----------
+ * req : Request
+ *     Body JSON { hasil: string, tanda: string }.
+ * params : Promise<{ id: string }>
+ *     Identitas sesi.
+ *
+ * Returns
+ * -------
+ * Promise<NextResponse>
+ *     { ok: true } bila tersimpan; 400, 401, 403, 404, atau 409 bila ditolak.
+ */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(req)) return NextResponse.json({ error: "Permintaan ditolak." }, { status: 403 });
   const user = await currentUser();

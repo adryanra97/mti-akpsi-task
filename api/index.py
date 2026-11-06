@@ -1,7 +1,26 @@
 """ServerAgent Core Module (FastAPI) untuk Vercel Python Runtime.
 
-Satu-satunya pintu masuk adalah PermintaanAnalisis yang ditandatangani Dashboard (JWT HS256 dengan AUTH_SECRET).
-Hasil ditandatangani HMAC-SHA256 agar Dashboard dapat memastikan hasil berasal dari Core Module dan tidak diubah.
+Satu-satunya pintu masuk adalah PermintaanAnalisis yang ditandatangani Dashboard
+(JWT HS256 dengan ``AUTH_SECRET``). Hasil ditandatangani HMAC-SHA256 agar Dashboard dapat
+memastikan hasil berasal dari Core Module dan tidak diubah di perjalanan.
+
+Endpoint
+--------
+GET /api/py/sehat
+    Pemeriksaan kesehatan dan daftar layanan pada registri.
+POST /api/py/analisis
+    Menjalankan AgenAnalisis dan mengalirkan event NDJSON.
+POST /api/py/uji-koneksi
+    Menguji API key dan nama model penyedia LLM.
+
+Attributes
+----------
+DEV_SECRET : str
+    Rahasia khusus pengembangan lokal; tidak pernah dipakai di Vercel.
+DI_VERCEL : bool
+    ``True`` bila berjalan di Vercel (environment variable ``VERCEL=1``).
+app : fastapi.FastAPI
+    Aplikasi ASGI tanpa halaman dokumentasi publik.
 """
 from __future__ import annotations
 
@@ -28,6 +47,18 @@ app = FastAPI(title="ServerAgent Core Module", docs_url=None, redoc_url=None, op
 
 
 def rahasia() -> bytes:
+    """Mengambil kunci penandatangan bersama Dashboard.
+
+    Returns
+    -------
+    bytes
+        ``AUTH_SECRET`` bila panjangnya minimal 32 karakter; di luar Vercel dipakai ``DEV_SECRET``.
+
+    Raises
+    ------
+    fastapi.HTTPException
+        Status 503 bila berjalan di Vercel dan ``AUTH_SECRET`` belum diatur.
+    """
     s = os.environ.get("AUTH_SECRET", "")
     if len(s) >= 32:
         return s.encode()
@@ -37,6 +68,25 @@ def rahasia() -> bytes:
 
 
 def verifikasi_token(token: str, tujuan: str) -> dict:
+    """Memverifikasi token JWT permintaan dari Dashboard.
+
+    Parameters
+    ----------
+    token : str
+        JWT HS256 dengan audiens ``serveragent-core``.
+    tujuan : {"analisis", "uji-koneksi"}
+        Nilai klaim ``tujuan`` yang diharapkan, agar token satu endpoint tidak dipakai di endpoint lain.
+
+    Returns
+    -------
+    dict
+        Klaim token yang sudah terverifikasi.
+
+    Raises
+    ------
+    fastapi.HTTPException
+        Status 401 bila token kedaluwarsa, tanda tangan salah, atau tujuan tidak cocok.
+    """
     try:
         data = jwt.decode(token, rahasia(), algorithms=["HS256"], audience="serveragent-core")
     except jwt.ExpiredSignatureError as e:
@@ -49,22 +99,61 @@ def verifikasi_token(token: str, tujuan: str) -> dict:
 
 
 def tanda_tangan(teks: str) -> str:
+    """Membuat tanda HMAC-SHA256 untuk teks hasil.
+
+    Parameters
+    ----------
+    teks : str
+        JSON hasil analisis yang sudah diserialisasi.
+
+    Returns
+    -------
+    str
+        Tanda tangan dalam heksadesimal.
+    """
     return hmac.new(rahasia(), teks.encode(), hashlib.sha256).hexdigest()
 
 
 @app.get("/api/py/sehat")
 def sehat():
+    """Endpoint pemeriksaan kesehatan Core Module.
+
+    Returns
+    -------
+    dict
+        Status, nama komponen, versi Python, dan nama layanan pada registri.
+    """
     return {"status": "ok", "komponen": "ServerAgent Core Module", "python": sys.version.split()[0],
             "layanan": [x["nama"] for x in REGISTRI["layanan"]]}
 
 
 @app.post("/api/py/analisis")
 async def analisis(req: Request):
+    """Endpoint utama: menjalankan AgenAnalisis untuk satu PermintaanAnalisis.
+
+    Parameters
+    ----------
+    req : fastapi.Request
+        Body JSON ``{"token": str}``; klaim ``permintaan`` berisi seluruh masukan analisis.
+
+    Returns
+    -------
+    fastapi.responses.StreamingResponse
+        Aliran NDJSON berisi event ``status`` dan ``step``, lalu ``done`` dengan ``hasil``
+        (string JSON) dan ``tanda`` (HMAC), atau ``error`` bila pemrosesan gagal.
+    """
     body = await req.json()
     data = verifikasi_token(str(body.get("token", "")), "analisis")
     permintaan = data["permintaan"]
 
     def aliran():
+        """Generator baris NDJSON dari event AgenAnalisis.
+
+        Yields
+        ------
+        str
+            Satu event JSON per baris.
+        """
         try:
             for ev in AgenAnalisis(permintaan).proses():
                 if ev["type"] == "hasil":
@@ -81,6 +170,18 @@ async def analisis(req: Request):
 
 @app.post("/api/py/uji-koneksi")
 async def uji_koneksi(req: Request):
+    """Endpoint uji koneksi penyedia LLM dari halaman Pengaturan.
+
+    Parameters
+    ----------
+    req : fastapi.Request
+        Body JSON ``{"token": str}``; klaim memuat ``provider`` dan ``model``.
+
+    Returns
+    -------
+    dict or fastapi.responses.JSONResponse
+        ``{"ok": bool, "message": str}`` beserta waktu tempuh atau pesan galat.
+    """
     body = await req.json()
     data = verifikasi_token(str(body.get("token", "")), "uji-koneksi")
     import time

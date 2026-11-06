@@ -1,3 +1,9 @@
+/**
+ * Pengisi data contoh dari `seed-data.json` yang dibangkitkan Core Module Python.
+ *
+ * Tanda waktu digeser relatif terhadap hari ini agar data contoh selalu tampak baru, lalu
+ * riwayat status, dokumen sign-off, laporan, dan log audit dibentuk sesuai state machine.
+ */
 import type {
   AlignmentParams,
   AlignmentSession,
@@ -52,15 +58,58 @@ const QA = "QA/Performance Tester";
 const IE = "Integration Engineer";
 const PM = "Project/Technical Manager";
 
+/**
+ * Tanggal beberapa hari yang lalu pada jam WIB tertentu.
+ *
+ * Parameters
+ * ----------
+ * daysAgo : number
+ *     Jumlah hari sebelum hari ini; negatif untuk hari mendatang.
+ * hourWib : number, default 10
+ *     Jam pada zona WIB.
+ *
+ * Returns
+ * -------
+ * Date
+ */
 function at(daysAgo: number, hourWib = 10) {
   const d = new Date(Date.now() - daysAgo * DAY);
   d.setUTCHours(hourWib - 7, 0, 0, 0);
   return d;
 }
 
+/**
+ * Menambah menit ke sebuah tanggal.
+ *
+ * Parameters
+ * ----------
+ * d : Date
+ *     Tanggal awal.
+ * minutes : number
+ *     Jumlah menit.
+ *
+ * Returns
+ * -------
+ * string
+ *     Tanggal hasil dalam ISO 8601.
+ */
 const plus = (d: Date, minutes: number) => new Date(d.getTime() + minutes * MIN).toISOString();
 
-/** Menggeser seluruh tanda waktu hasil ke waktu sesi agar data contoh selalu terlihat baru. */
+/**
+ * Menggeser seluruh tanda waktu hasil analisis ke waktu sesi.
+ *
+ * Parameters
+ * ----------
+ * r : AnalysisResult
+ *     Hasil Core Module dari data contoh.
+ * when : Date
+ *     Waktu analisis yang baru.
+ *
+ * Returns
+ * -------
+ * AnalysisResult
+ *     Salinan hasil dengan waktu diterima, selesai, rencana, verdict, jejak, dan periode baseline baru.
+ */
 function retime(r: AnalysisResult, when: Date): AnalysisResult {
   const iso = when.toISOString();
   const end = plus(when, 1);
@@ -79,6 +128,18 @@ function retime(r: AnalysisResult, when: Date): AnalysisResult {
   };
 }
 
+/**
+ * Mengisi seluruh tabel dengan data contoh.
+ *
+ * Parameters
+ * ----------
+ * insert : Insert
+ *     Fungsi penyimpan baris (tabel, id, data, createdAt) dari lapisan database.
+ *
+ * Returns
+ * -------
+ * Promise<void>
+ */
 export async function seed(insert: Insert) {
   const settings = { ...DEFAULT_SETTINGS };
   const sessions: AlignmentSession[] = [];

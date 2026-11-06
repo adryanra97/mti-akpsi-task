@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Formulir masuk ringkas: pilih peran, isi kata sandi, Masuk.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useRef, useState } from "react";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
@@ -8,8 +11,21 @@ import { USERS, ROLE_LABEL, ROLE_GOAL } from "@/lib/roles";
 import { Button, Field, Input, cx } from "@/components/ui";
 
 /**
- * Formulir masuk ringkas: pilih peran (radio, langsung menjadi nama pengguna), isi kata sandi, Masuk.
- * Seluruh formulir muat dalam satu layar laptop agar tombol utama selalu terlihat.
+ * Formulir masuk yang muat dalam satu layar agar tombol utama selalu terlihat.
+ *
+ * Peran dipilih lewat radio dan langsung menjadi nama pengguna; klik peran memindahkan fokus
+ * ke kata sandi.
+ *
+ * Parameters
+ * ----------
+ * next : string
+ *     Path tujuan setelah masuk.
+ * configProblems : string[]
+ *     Konfigurasi server yang belum lengkap; ditampilkan sebagai peringatan.
+ *
+ * Returns
+ * -------
+ * JSX.Element
  */
 export function LoginForm({ next, configProblems }: { next: string; configProblems: string[] }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(login, {});

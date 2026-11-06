@@ -1,4 +1,9 @@
 import "server-only";
+/**
+ * Pembuat berkas unduhan: PDF laporan alignment, dokumen sign-off, laporan insiden, dan CSV riwayat.
+ *
+ * Teks bebas disamarkan sebelum masuk berkas; laporan berlabel NDA hanya memuat data agregat.
+ */
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import type { AlignmentSession, Incident, ReportEntry, SignoffDoc, AnalysisResult } from "./types";
@@ -7,7 +12,19 @@ import { INCIDENT_TYPE_LABEL, latestResult, mttrMinutes, peakSummary } from "./d
 import { maskText } from "./masking";
 import { KIND_LABEL } from "./reports";
 
-/** Font standar PDF hanya mendukung Latin-1; ganti simbol yang tidak tersedia. */
+/**
+ * Menyesuaikan teks agar dapat dicetak font standar PDF (Latin-1).
+ *
+ * Parameters
+ * ----------
+ * s : string | number | null | undefined
+ *     Nilai yang dicetak.
+ *
+ * Returns
+ * -------
+ * string
+ *     Teks dengan simbol seperti "≤" dan "×" diganti padanan ASCII; "-" bila kosong.
+ */
 function t(s: string | number | null | undefined) {
   return String(s ?? "-")
     .replace(/≤/g, "<=")
@@ -20,21 +37,81 @@ function t(s: string | number | null | undefined) {
     .replace(/[^\x00-\xFF]/g, "");
 }
 
-/** Penyamaran teks bebas sebelum keluar dari sistem dalam bentuk berkas. */
+/**
+ * Menyamarkan lalu menyesuaikan teks bebas sebelum masuk berkas.
+ *
+ * Parameters
+ * ----------
+ * s : string | undefined
+ *     Teks bebas dari pengguna.
+ *
+ * Returns
+ * -------
+ * string
+ */
 function m(s: string | undefined) {
   return t(maskText(s));
 }
 
+/**
+ * Memformat tanggal untuk PDF dalam WIB.
+ *
+ * Parameters
+ * ----------
+ * iso : string, optional
+ *     Tanggal ISO 8601.
+ *
+ * Returns
+ * -------
+ * string
+ *     Contoh "6 Nov 2026, 14.00 WIB"; "-" bila kosong.
+ */
 const fd = (iso?: string) =>
   iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" }) + " WIB" : "-";
 
+/**
+ * Pembungkus jsPDF A4 dengan kursor vertikal dan gaya ServerAgent.
+ *
+ * Attributes
+ * ----------
+ * pdf : jsPDF
+ *     Dokumen PDF.
+ * y : number
+ *     Posisi vertikal berikutnya dalam point.
+ * x : number
+ *     Margin kiri dalam point.
+ * w : number
+ *     Lebar area isi dalam point.
+ */
 class Doc {
   pdf = new jsPDF({ unit: "pt", format: "a4" });
   y = 56;
   readonly x = 48;
   readonly w = 595 - 96;
 
+  /**
+   * Mencetak kepala dokumen: merek, label NDA bila terbatas, judul, dan subjudul.
+   *
+   * Parameters
+   * ----------
+   * title : string
+   *     Judul dokumen.
+   * sub : string
+   *     Subjudul atau konteks.
+   * restricted : boolean
+   *     Tampilkan label "TERBATAS NDA".
+   */
   header(title: string, sub: string, restricted: boolean) {
+    /**
+     * Mencetak paragraf dengan pemenggalan baris dan pindah halaman otomatis.
+     *
+     * Parameters
+     * ----------
+     * text : string
+     *     Isi paragraf.
+     * color : [number, number, number], optional
+     *     Warna teks RGB.
+     */
     const p = this.pdf;
     p.setFillColor(45, 79, 216);
     p.rect(0, 0, 595, 6, "F");
@@ -51,6 +128,14 @@ class Doc {
     this.y += lines.length * 12 + 8;
   }
 
+  /**
+   * Mencetak judul bagian.
+   *
+   * Parameters
+   * ----------
+   * text : string
+   *     Judul bagian.
+   */
   h(text: string) {
     this.ensure(40);
     this.y += 10;
@@ -58,6 +143,16 @@ class Doc {
     this.y += 14;
   }
 
+  /**
+   * Mencetak paragraf dengan pemenggalan baris dan pindah halaman otomatis.
+   *
+   * Parameters
+   * ----------
+   * text : string
+   *     Isi paragraf.
+   * color : [number, number, number], optional
+   *     Warna teks RGB.
+   */
   p(text: string, color: [number, number, number] = [71, 83, 106]) {
     const lines = this.pdf.setFont("helvetica", "normal").setFontSize(9.5).setTextColor(...color).splitTextToSize(t(text), this.w);
     for (const line of lines) {
@@ -68,6 +163,14 @@ class Doc {
     this.y += 3;
   }
 
+  /**
+   * Mencetak tabel dua kolom label dan nilai tanpa garis.
+   *
+   * Parameters
+   * ----------
+   * rows : [string, string][]
+   *     Pasangan label dan nilai.
+   */
   kv(rows: [string, string][]) {
     autoTable(this.pdf, {
       startY: this.y,
@@ -80,6 +183,16 @@ class Doc {
     this.y = (this.pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
   }
 
+  /**
+   * Mencetak tabel bergaris dengan kepala kolom.
+   *
+   * Parameters
+   * ----------
+   * head : string[]
+   *     Judul kolom.
+   * body : (string | number)[][]
+   *     Baris data.
+   */
   table(head: string[], body: (string | number)[][]) {
     autoTable(this.pdf, {
       startY: this.y,
@@ -93,6 +206,14 @@ class Doc {
     this.y = (this.pdf as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
   }
 
+  /**
+   * Pindah ke halaman baru bila ruang tersisa kurang dari tinggi yang dibutuhkan.
+   *
+   * Parameters
+   * ----------
+   * h : number
+   *     Tinggi yang dibutuhkan dalam point.
+   */
   ensure(h: number) {
     if (this.y + h > 800) {
       this.pdf.addPage();
@@ -100,6 +221,14 @@ class Doc {
     }
   }
 
+  /**
+   * Mencetak catatan kaki dan nomor halaman pada setiap halaman.
+   *
+   * Parameters
+   * ----------
+   * note : string
+   *     Catatan kaki.
+   */
   footer(note: string) {
     const n = this.pdf.getNumberOfPages();
     for (let i = 1; i <= n; i++) {
@@ -110,11 +239,31 @@ class Doc {
     }
   }
 
+  /**
+   * Mengeluarkan isi PDF.
+   *
+   * Returns
+   * -------
+   * ArrayBuffer
+   */
   out() {
     return this.pdf.output("arraybuffer");
   }
 }
 
+/**
+ * Baris tabel indikator per langkah analisis.
+ *
+ * Parameters
+ * ----------
+ * r : AnalysisResult
+ *     Hasil Core Module.
+ *
+ * Returns
+ * -------
+ * string[][]
+ *     Kolom: langkah, CPU, memori, thread pool, p95, error, sumber angka, dan status.
+ */
 function indicatorRows(r: AnalysisResult) {
   return r.langkah.map((l) => {
     const x = l.ringkasan;
@@ -131,6 +280,18 @@ function indicatorRows(r: AnalysisResult) {
   });
 }
 
+/**
+ * Mencetak blok hasil analisis: verdict, alasan, syarat, indikator, Little's Law, dan rencana uji.
+ *
+ * Parameters
+ * ----------
+ * d : Doc
+ *     Dokumen tujuan.
+ * r : AnalysisResult
+ *     Hasil Core Module.
+ * restricted : boolean
+ *     Bila true, tabel indikator rinci diganti keterangan data agregat.
+ */
 function analysisBlock(d: Doc, r: AnalysisResult, restricted: boolean) {
   d.h("Verdict");
   const model = r.modelDigitalTwin;
@@ -165,6 +326,20 @@ function analysisBlock(d: Doc, r: AnalysisResult, restricted: boolean) {
   }
 }
 
+/**
+ * PDF laporan alignment satu sprint cycle.
+ *
+ * Parameters
+ * ----------
+ * s : AlignmentSession
+ *     Sesi yang sudah diputuskan.
+ * rep : ReportEntry
+ *     Entri laporan (identitas dan status NDA).
+ *
+ * Returns
+ * -------
+ * ArrayBuffer
+ */
 export function alignmentPdf(s: AlignmentSession, rep: ReportEntry) {
   const d = new Doc();
   const r = latestResult(s)!;
@@ -191,6 +366,20 @@ export function alignmentPdf(s: AlignmentSession, rep: ReportEntry) {
   return d.out();
 }
 
+/**
+ * PDF dokumen sign-off untuk lampiran release approval.
+ *
+ * Parameters
+ * ----------
+ * doc : SignoffDoc
+ *     Dokumen sign-off.
+ * rep : ReportEntry
+ *     Entri laporan.
+ *
+ * Returns
+ * -------
+ * ArrayBuffer
+ */
 export function signoffPdf(doc: SignoffDoc, rep: ReportEntry) {
   const d = new Doc();
   const s = doc.snapshot;
@@ -217,6 +406,20 @@ export function signoffPdf(doc: SignoffDoc, rep: ReportEntry) {
   return d.out();
 }
 
+/**
+ * PDF laporan insiden dengan verdict sebelum dan sesudah mitigasi serta data MTTR.
+ *
+ * Parameters
+ * ----------
+ * inc : Incident
+ *     Kasus insiden yang terdokumentasi.
+ * rep : ReportEntry
+ *     Entri laporan; deskripsi disamarkan dan indikator diganti agregat bila terbatas NDA.
+ *
+ * Returns
+ * -------
+ * ArrayBuffer
+ */
 export function incidentPdf(inc: Incident, rep: ReportEntry) {
   const d = new Doc();
   const data = inc.data;
@@ -253,6 +456,19 @@ export function incidentPdf(inc: Incident, rep: ReportEntry) {
   return d.out();
 }
 
+/**
+ * CSV riwayat laporan untuk analisis tren di luar sistem.
+ *
+ * Parameters
+ * ----------
+ * rows : ReportEntry[]
+ *     Laporan yang diekspor.
+ *
+ * Returns
+ * -------
+ * string
+ *     CSV dengan BOM UTF-8 agar terbaca benar di Excel; kolom indikator dikosongkan untuk baris terbatas NDA.
+ */
 export function reportsCsv(rows: ReportEntry[]) {
   const head = ["id", "jenis", "judul", "layanan", "rilis", "cycle", "verdict", "status", "cpu_puncak_pct", "memori_puncak_pct", "p95_puncak_ms", "kapasitas_maks_tps", "mttr_menit", "terbatas_nda", "tanggal"];
   const esc = (v: unknown) => {

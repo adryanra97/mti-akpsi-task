@@ -1,3 +1,8 @@
+/**
+ * Halaman masuk: formulir (lebih dulu di ponsel) dan pengantar dengan contoh papan promosi.
+ *
+ * Halaman ini publik, sehingga papan memakai contoh ilustratif, bukan data asli.
+ */
 import type { Metadata } from "next";
 import { LoginForm } from "./login-form";
 import { authConfigProblems } from "@/lib/auth-config";
@@ -14,6 +19,18 @@ const SAMPLE: BoardRow[] = [
   { key: "d", date: "Sel", time: "15.00", release: "Rilis Deteksi Fraud", service: "Layanan Deteksi Fraud", cycle: 1, gate: "Dev → Production", status: "Menunggu", tone: "wait" },
 ];
 
+/**
+ * Halaman masuk.
+ *
+ * Parameters
+ * ----------
+ * searchParams : Promise<{ next?: string }>
+ *     Path tujuan setelah masuk.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
   return (

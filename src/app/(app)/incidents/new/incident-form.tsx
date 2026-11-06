@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Formulir kasus insiden baru.
+ */
 import { submitWith } from "@/components/form";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
@@ -14,6 +17,20 @@ const TYPES: { value: IncidentType; title: string; body: string }[] = [
   { value: "lainnya", title: "Lainnya", body: "Gejala performa lain." },
 ];
 
+/**
+ * Formulir data insiden dengan field tambahan sesuai tipe insiden.
+ *
+ * Parameters
+ * ----------
+ * services : { name: string; spec: Spec }[]
+ *     Layanan beserta spesifikasi Production untuk isian awal.
+ * nowWib : string
+ *     Waktu sekarang (WIB) untuk isian awal waktu deteksi.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function IncidentForm({ services, nowWib }: { services: { name: string; spec: Spec }[]; nowWib: string }) {
   const [state, action, pending] = useActionState<IncFormState, FormData>(createIncident, {});
   const v = state.values ?? {};

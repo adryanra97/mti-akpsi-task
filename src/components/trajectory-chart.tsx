@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Grafik trajektori sumber daya dari deret waktu digital twin (recharts).
+ */
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { AnalysisStep } from "@/lib/types";
@@ -11,6 +14,24 @@ const SERIES = [
   { key: "thread", name: "Thread pool", color: "var(--series-3)" },
 ] as const;
 
+/**
+ * Tooltip grafik dengan nilai setiap seri pada detik tertentu.
+ *
+ * Parameters
+ * ----------
+ * active : boolean, optional
+ *     Tooltip sedang aktif.
+ * payload : { name: string; value: number; color: string }[], optional
+ *     Nilai seri.
+ * label : number, optional
+ *     Detik simulasi.
+ * unit : string
+ *     Satuan nilai.
+ *
+ * Returns
+ * -------
+ * JSX.Element | null
+ */
 function Tip({ active, payload, label, unit }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: number; unit: string }) {
   if (!active || !payload?.length) return null;
   return (
@@ -28,7 +49,19 @@ function Tip({ active, payload, label, unit }: { active?: boolean; payload?: { n
   );
 }
 
-/** Trajektori CPU, memori, dan thread pool (deret waktu digital twin SimPy) untuk satu langkah. */
+/**
+ * Grafik CPU, memori, dan thread pool, serta p95, untuk skenario yang dipilih.
+ *
+ * Parameters
+ * ----------
+ * steps : AnalysisStep[]
+ *     Langkah dengan deret waktu.
+ *
+ * Returns
+ * -------
+ * JSX.Element | null
+ *     null bila tidak ada deret waktu.
+ */
 export function TrajectoryChart({ steps }: { steps: AnalysisStep[] }) {
   const usable = steps.filter((s) => s.deretWaktu?.length);
   const [key, setKey] = useState(usable.find((s) => s.kunci === "puncak" || s.kunci === "insiden")?.kunci ?? usable[0]?.kunci);

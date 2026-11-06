@@ -1,3 +1,6 @@
+/**
+ * Halaman daftar dokumen sign-off (menunggu keputusan dan sudah diputuskan).
+ */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listSignoffs } from "@/lib/data";
@@ -11,6 +14,18 @@ export const metadata: Metadata = { title: "Sign-off" };
 
 const TONE = { Draf: "neutral", MenungguKeputusan: "warn", Disetujui: "pass", Ditolak: "fail" } as const;
 
+/**
+ * Satu baris dokumen sign-off.
+ *
+ * Parameters
+ * ----------
+ * d : SignoffDoc
+ *     Dokumen sign-off.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 function Row({ d }: { d: SignoffDoc }) {
   return (
     <li className="border-b border-line last:border-0">
@@ -30,6 +45,13 @@ function Row({ d }: { d: SignoffDoc }) {
   );
 }
 
+/**
+ * Halaman daftar dokumen sign-off.
+ *
+ * Returns
+ * -------
+ * Promise<JSX.Element>
+ */
 export default async function SignoffList() {
   const docs = (await listSignoffs()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const pending = docs.filter((d) => d.status === "MenungguKeputusan" || d.status === "Draf");
