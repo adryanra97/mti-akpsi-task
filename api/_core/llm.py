@@ -92,6 +92,35 @@ class GagalLLM(Exception):
 ENV_KEY = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
 
 
+def _pesan_galat(e: Exception, provider: str, model: str) -> str:
+    """Menyusun pesan galat LLM yang bisa ditindaklanjuti pengguna.
+
+    Parameters
+    ----------
+    e : Exception
+        Galat asli dari SDK penyedia.
+    provider : str
+        Penyedia LLM.
+    model : str
+        Nama model yang dipanggil.
+
+    Returns
+    -------
+    str
+        Pesan singkat; untuk model yang tidak ditemukan atau sudah dihentikan, disertai saran
+        mengganti nama model di Pengaturan.
+    """
+    teks = str(e)
+    if "NOT_FOUND" in teks or "404" in teks or "not_found" in teks.lower() or "does not exist" in teks.lower():
+        return (f"Model '{model}' tidak tersedia di {provider} (mungkin sudah dihentikan). "
+                "Ganti nama model di Pengaturan, lalu uji koneksi lagi.")
+    if "401" in teks or "403" in teks or "API key" in teks or "PERMISSION_DENIED" in teks:
+        return f"API key {provider} ditolak. Periksa environment variable API key di Vercel, lalu redeploy."
+    if "429" in teks or "RESOURCE_EXHAUSTED" in teks or "rate" in teks.lower():
+        return f"Kuota atau batas laju {provider} habis. Coba lagi beberapa saat lagi."
+    return teks[:300]
+
+
 class LayananLLM:
     """Pembungkus model chat LangChain dengan pencatatan token dan biaya.
 
@@ -196,7 +225,7 @@ class LayananLLM:
         except GagalLLM:
             raise
         except Exception as e:  # noqa: BLE001
-            raise GagalLLM(str(e)[:300]) from e
+            raise GagalLLM(_pesan_galat(e, self.provider, self.model)) from e
         self._catat_pemakaian(hasil.get("raw"))
         if hasil.get("parsed") is None:
             raise GagalLLM(f"Keluaran model tidak sesuai skema: {str(hasil.get('parsing_error'))[:200]}")
@@ -225,7 +254,7 @@ class LayananLLM:
         except GagalLLM:
             raise
         except Exception as e:  # noqa: BLE001
-            raise GagalLLM(str(e)[:300]) from e
+            raise GagalLLM(_pesan_galat(e, self.provider, self.model)) from e
         self._catat_pemakaian(msg)
         c = msg.content
         if isinstance(c, list):

@@ -6,7 +6,7 @@ import "server-only";
  */
 import { get, put } from "./db";
 import type { AppSettings, ProviderId } from "./types";
-import { DEFAULT_SETTINGS } from "./settings-defaults";
+import { DEFAULT_SETTINGS, RETIRED_MODELS } from "./settings-defaults";
 export { DEFAULT_SETTINGS, PROVIDER_LABEL, MODEL_SUGGESTIONS } from "./settings-defaults";
 
 /**
@@ -31,6 +31,9 @@ export function providerKeyConfigured(p: ProviderId) {
 /**
  * Membaca pengaturan aplikasi, digabung dengan nilai bawaan.
  *
+ * Model yang sudah dihentikan penyedia (lihat \`RETIRED_MODELS\`) diganti otomatis dengan
+ * penggantinya beserta harga per token.
+ *
  * Returns
  * -------
  * Promise<AppSettings>
@@ -38,7 +41,18 @@ export function providerKeyConfigured(p: ProviderId) {
  */
 export async function getSettings(): Promise<AppSettings> {
   const s = await get<AppSettings & { id: string }>("sa_settings", "app");
-  return { ...DEFAULT_SETTINGS, ...(s ?? {}) };
+  const out = { ...DEFAULT_SETTINGS, ...(s ?? {}) };
+  // Model yang sudah dihentikan penyedia diganti otomatis beserta harganya.
+  out.models = { ...out.models };
+  out.prices = { ...out.prices };
+  for (const p of Object.keys(out.models) as ProviderId[]) {
+    const r = RETIRED_MODELS[out.models[p]];
+    if (r) {
+      out.models[p] = r.model;
+      out.prices[p] = r.price;
+    }
+  }
+  return out;
 }
 
 /**
