@@ -4,78 +4,78 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --bg: #eef0f2;
+  --bg: #f3f7fd;
   --surface: #ffffff;
-  --surface-2: #f6f7f8;
-  --sunken: #e6e9ec;
-  --ink: #0e141b;
-  --ink-2: #3f4a57;
-  --ink-3: #5d6876;
-  --line: #d7dce2;
-  --line-strong: #bcc4cd;
-  --accent: #4433d6;
-  --accent-hover: #3626b8;
-  --accent-soft: #ecebfd;
+  --surface-2: #f7faff;
+  --sunken: #eaf1fb;
+  --ink: #10243e;
+  --ink-2: #3e536e;
+  --ink-3: #576d87;
+  --line: #dce6f2;
+  --line-strong: #b9cbe1;
+  --accent: #165ed9;
+  --accent-hover: #104eb9;
+  --accent-soft: #e9f1ff;
   --accent-ink: #ffffff;
-  --primary: #0e141b;
-  --primary-hover: #26303b;
+  --primary: #165ed9;
+  --primary-hover: #104eb9;
   --primary-ink: #ffffff;
-  --board: #0e141b;
-  --board-2: #18212b;
-  --board-line: #2a3542;
-  --board-ink: #eef1f4;
-  --board-ink-2: #a3aebb;
-  --amber: #ffb547;
-  --pass: #137547;
-  --pass-soft: #def2e6;
-  --cond: #9a5500;
-  --cond-soft: #fff0d6;
-  --fail: #bd2f25;
-  --fail-soft: #fde6e3;
-  --na: #536072;
-  --na-soft: #e6e9ee;
-  --focus: #4433d6;
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
+  --board: #0b2040;
+  --board-2: #16375f;
+  --board-line: #2a4c73;
+  --board-ink: #f4f8ff;
+  --board-ink-2: #becfe6;
+  --amber: #f8bd69;
+  --pass: #11734d;
+  --pass-soft: #e0f5ea;
+  --cond: #92520a;
+  --cond-soft: #fff3df;
+  --fail: #b6293c;
+  --fail-soft: #ffe9ed;
+  --na: #54667c;
+  --na-soft: #eaf0f7;
+  --focus: #165ed9;
+  --series-1: #165ed9;
+  --series-2: #17a28d;
+  --series-3: #d38c28;
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  --bg: #0a0f15;
-  --surface: #111821;
-  --surface-2: #161f2a;
-  --sunken: #0d131a;
-  --ink: #e8ecf1;
-  --ink-2: #aeb8c5;
-  --ink-3: #8a96a5;
-  --line: #243041;
-  --line-strong: #324055;
-  --accent: #9d93ff;
-  --accent-hover: #b4acff;
-  --accent-soft: #221d4d;
-  --accent-ink: #0a0f15;
-  --primary: #e8ecf1;
-  --primary-hover: #ffffff;
-  --primary-ink: #0a0f15;
-  --board: #05080c;
-  --board-2: #0f161e;
-  --board-line: #222d3a;
-  --board-ink: #eef1f4;
-  --board-ink-2: #a3aebb;
-  --amber: #ffb547;
-  --pass: #4fc48b;
-  --pass-soft: #11301f;
-  --cond: #f2b257;
-  --cond-soft: #38270f;
-  --fail: #ff7a6f;
-  --fail-soft: #3b1917;
-  --na: #a6afbf;
-  --na-soft: #212a38;
-  --focus: #b4acff;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
+  --bg: #071427;
+  --surface: #10243e;
+  --surface-2: #172e4b;
+  --sunken: #0a1b31;
+  --ink: #eff6ff;
+  --ink-2: #c5d5eb;
+  --ink-3: #a2b8d3;
+  --line: #294562;
+  --line-strong: #416080;
+  --accent: #82b5ff;
+  --accent-hover: #a1c8ff;
+  --accent-soft: #173b69;
+  --accent-ink: #071427;
+  --primary: #82b5ff;
+  --primary-hover: #a1c8ff;
+  --primary-ink: #071427;
+  --board: #06162e;
+  --board-2: #123259;
+  --board-line: #294a70;
+  --board-ink: #f4f8ff;
+  --board-ink-2: #c1d1e7;
+  --amber: #f8bd69;
+  --pass: #64d5a5;
+  --pass-soft: #133e33;
+  --cond: #ffce80;
+  --cond-soft: #3f2e19;
+  --fail: #ff889b;
+  --fail-soft: #481d2c;
+  --na: #b5c4d5;
+  --na-soft: #29394e;
+  --focus: #82b5ff;
+  --series-1: #82b5ff;
+  --series-2: #50d0bd;
+  --series-3: #ffc36e;
   color-scheme: dark;
 }
 
@@ -134,7 +134,7 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.6;
   font-feature-settings: "tnum" 1;
   -webkit-font-smoothing: antialiased;
 }
@@ -143,24 +143,24 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  font-stretch: 108%;
+  font-stretch: 100%;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
 h1 {
-  font-stretch: 116%;
-  font-weight: 800;
-  letter-spacing: -0.025em;
+  font-stretch: 104%;
+  font-weight: 750;
+  letter-spacing: -0.035em;
 }
 
 /* Lebar huruf Archivo: lebar untuk judul, sempit untuk papan promosi. */
 .font-wide {
-  font-stretch: 122%;
+  font-stretch: 108%;
 }
 .font-narrow {
-  font-stretch: 76%;
+  font-stretch: 90%;
 }
 
 /* Papan promosi: sel bergaya split-flap. */
@@ -266,3 +266,11 @@ h1 {
 @media (prefers-reduced-motion: reduce) {
   .route-progress { animation: none; width: 100%; opacity: 0.7; }
 }
+
+/* Visual rhythm: clear hierarchy and consistent, gently elevated surfaces. */
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+@media (hover: hover) {
+  a, button { transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease; }
+}
+table { font-variant-numeric: tabular-nums; }
