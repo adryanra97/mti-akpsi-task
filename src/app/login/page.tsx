@@ -3,7 +3,7 @@
  *
  * Halaman ini publik, sehingga papan memakai contoh ilustratif, bukan data asli.
  */
-import type { Metadata } from "next";
+import type { Metadata } from "next";\nimport Link from "next/link";\nimport { ArrowUpRight, PlayCircle } from "lucide-react";
 import { LoginForm } from "./login-form";
 import { authConfigProblems } from "@/lib/auth-config";
 import { DepartureBoard, type BoardRow } from "@/components/board";
@@ -43,6 +43,19 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="mx-auto w-full max-w-[440px] rounded-2xl border border-line bg-surface p-5 shadow-[0_16px_48px_rgba(17,58,108,0.06)] sm:p-8">
           <LoginForm next={next ?? "/"} configProblems={authConfigProblems()} />
+          <div className="mt-6">
+            <div className="mb-4 flex items-center gap-3 text-[12px] font-semibold uppercase tracking-wider text-ink-3">
+              <span className="h-px flex-1 bg-line" aria-hidden />
+              Atau coba produknya
+              <span className="h-px flex-1 bg-line" aria-hidden />
+            </div>
+            <Link href="/demo" className="group flex w-full items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent-soft px-4 py-3.5 text-[14px] font-bold text-accent transition-colors hover:border-accent hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+              <PlayCircle className="h-5 w-5" aria-hidden />
+              Explore Interactive Demo
+              <ArrowUpRight className="h-4 w-4 opacity-70 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden />
+            </Link>
+            <p className="mt-2 text-center text-[12.5px] text-ink-3">Tanpa akun atau kata sandi · Data simulasi terisolasi</p>
+          </div>
         </div>
       </section>
 
