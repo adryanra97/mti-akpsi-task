@@ -12,8 +12,22 @@ interface DbState {
 
 const g = globalThis as unknown as { __saDb?: Promise<DbState> };
 
+/**
+ * Mencari URL koneksi Postgres. Integrasi Neon di Vercel bisa memberi awalan pada nama variabel
+ * (mis. MTI_AKPSI_DATABASE_URL), jadi variabel berawalan juga dikenali. Koneksi pooled diutamakan.
+ */
+function databaseUrl(): string | undefined {
+  const env = process.env;
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (env.POSTGRES_URL) return env.POSTGRES_URL;
+  const keys = Object.keys(env).sort();
+  const pick = (re: RegExp) => keys.find((k) => re.test(k) && env[k]);
+  const k = pick(/_DATABASE_URL$/) ?? pick(/_POSTGRES_URL$/);
+  return k ? env[k] : undefined;
+}
+
 async function connect(): Promise<DbState> {
-  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const url = databaseUrl();
   let state: DbState;
   if (url) {
     const { neon } = await import("@neondatabase/serverless");

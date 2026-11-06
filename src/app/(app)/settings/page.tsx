@@ -25,7 +25,7 @@ export default async function SettingsPage() {
             <KeyValue
               items={[
                 ["Status", kind === "postgres" ? <Tag key="p" tone="pass">Postgres tersambung</Tag> : <Tag key="m" tone="warn">Sementara di memori</Tag>],
-                ["Penyimpanan", kind === "postgres" ? "Data tersimpan permanen." : "Isi DATABASE_URL (Neon) agar data tidak hilang saat server dimulai ulang."],
+                ["Penyimpanan", kind === "postgres" ? "Data tersimpan permanen." : "Sambungkan Neon di tab Storage Vercel agar data tidak hilang saat server dimulai ulang."],
               ]}
             />
             <div className="mt-4 border-t border-line pt-4">
