@@ -72,7 +72,7 @@ export async function middleware(req: NextRequest) {
 
   const session = await verifySession(req.cookies.get(COOKIE)?.value);
 
-  if (pathname.startsWith("/login")) {
+  // Public product tour: standalone sample data, no authenticated application access.\n  if (pathname === "/demo") return pass();\n\n  if (pathname.startsWith("/login")) {
     if (session) return go(new URL("/", req.url));
     return pass();
   }
