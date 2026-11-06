@@ -88,7 +88,7 @@ export function CpuTrend({ series }: { series: CpuSeries[] }) {
       </ul>
       <div className="h-[220px]" role="img" aria-label="Grafik kebutuhan CPU saat beban puncak per sprint cycle untuk setiap rilis">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 44, bottom: 0, left: -12 }}>
+          <LineChart data={data} margin={{ top: 8, right: 76, bottom: 0, left: -12 }}>
             <CartesianGrid stroke="var(--line)" vertical={false} />
             <XAxis dataKey="cycle" tickFormatter={(c) => `C${c}`} stroke="var(--ink-3)" tick={{ fontSize: 12, fill: "var(--ink-3)" }} tickLine={false} axisLine={{ stroke: "var(--line-strong)" }} />
             <YAxis unit="%" domain={[0, (max: number) => Math.max(100, Math.ceil(max / 10) * 10)]} tick={{ fontSize: 12, fill: "var(--ink-3)" }} tickLine={false} axisLine={false} width={48} />

@@ -1,5 +1,8 @@
 "use client";
 
+/**
+ * Grafik contoh untuk tur produk (/demo), memakai data statis dan recharts.
+ */
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const grid = "#e5edf8";
@@ -20,6 +23,13 @@ const services = [
   { name: "Fraud", baseline: 38, candidate: 52 },
 ];
 
+/**
+ * Tren persentase rilis yang siap promosi per sprint cycle (data contoh).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function ReadinessTrend() {
   return <section className={card} aria-label="Release readiness trend chart">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">QUALITY TREND</p><h2 className="mt-1 text-lg font-bold">Release readiness</h2><p className="mt-1 text-xs text-slate-500">Persentase rilis siap dari 5 sprint cycle · data contoh</p></div><span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">+42 poin sejak C1</span></div>
@@ -33,6 +43,13 @@ export function ReadinessTrend() {
   </section>;
 }
 
+/**
+ * Perbandingan utilisasi CPU baseline dan kandidat rilis per layanan (data contoh).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function CpuBenchmark() {
   return <section className={card} aria-label="CPU baseline versus release candidate comparison">
     <div><p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">BASELINE VS CANDIDATE</p><h2 className="mt-1 text-lg font-bold">CPU utilization by service</h2><p className="mt-1 text-xs text-slate-500">Perbandingan utilisasi baseline dan saat simulasi rilis · data contoh</p></div>
@@ -44,6 +61,13 @@ export function CpuBenchmark() {
   </section>;
 }
 
+/**
+ * Tren kesiapan, latensi p95, dan jumlah insiden lintas cycle (data contoh).
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function TrendReport() {
   return <div className="grid gap-5 xl:grid-cols-2">
     <ReadinessTrend />
@@ -61,6 +85,20 @@ export function TrendReport() {
   </div>;
 }
 
+/**
+ * Perbandingan hasil simulasi dengan batas kriteria penerimaan.
+ *
+ * Parameters
+ * ----------
+ * cpu : number
+ *     Utilisasi CPU hasil simulasi dalam persen.
+ * p95 : number
+ *     Response time p95 hasil simulasi dalam milidetik.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export function SimulationComparison({ cpu, p95 }: { cpu: number; p95: number }) {
   const rows = [{metric:"CPU",baseline:52,candidate:cpu,limit:80},{metric:"p95 / 10",baseline:24,candidate:Math.round(p95/10),limit:35}];
   return <section className={card} aria-label="Simulation comparison charts"><p className="text-[11px] font-bold uppercase tracking-wider text-blue-600">SCENARIO COMPARISON</p><h2 className="mt-1 text-lg font-bold">Baseline vs simulated load</h2><p className="mt-1 text-xs text-slate-500">CPU dalam %, latency dalam puluhan ms agar skala terbaca</p>

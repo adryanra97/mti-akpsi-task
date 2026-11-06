@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Tur produk interaktif publik (/demo) tanpa login.
+ *
+ * Seluruh data adalah contoh statis di browser: tidak membaca database, sesi, atau Core Module,
+ * dan tindakan di halaman ini tidak mengubah sistem utama. Matriks akses (VIEWS dan ACTIONS)
+ * mencerminkan aturan di src/lib/roles.ts.
+ */
 import Link from "next/link";
 import { CpuBenchmark, ReadinessTrend, SimulationComparison, TrendReport } from "./demo-charts";
 import { useState } from "react";
@@ -68,6 +75,13 @@ const ROLE_DESCRIPTIONS: Record<Role, { focus: string; next: string }> = {
   SUP: { focus: "Operational monitoring & reporting", next: "Review the incident trend and download the sample report." },
 };
 
+/**
+ * Halaman tur produk dengan pemilih peran, navigasi per bagian, dan aksi simulasi.
+ *
+ * Returns
+ * -------
+ * JSX.Element
+ */
 export default function DemoPage() {
   const [role, setRole] = useState<Role>("TL");
   const [view, setView] = useState<View>("overview");
@@ -92,6 +106,10 @@ export default function DemoPage() {
     { title: "Requires attention", value: decision === "Return" ? "03" : "02", help: "Review or remediation needed", Icon: ShieldAlert },
     { title: "Open incidents", value: incident ? "01" : "02", help: "Operational monitoring", Icon: Activity },
   ];
+  /**
+   * Mengembalikan tur ke keadaan awal: beban 45 TPS, simulasi, keputusan, insiden, dan sign-off
+   * dikosongkan, lalu kembali ke Overview.
+   */
   function reset() { setTps(45); setSimulated(false); setDecision("Pending"); setIncident(false); setSigned(false); setView("overview"); }
   const roleDefault: Record<Role, View> = { TL: "alignment", QA: "alignment", IE: "incidents", PM: "signoff", SUP: "reports" };
   const content = (
