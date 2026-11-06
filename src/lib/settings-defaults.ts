@@ -1,0 +1,34 @@
+import type { AppSettings, ProviderId } from "./types";
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  mode: "demo",
+  provider: "anthropic",
+  models: {
+    anthropic: "claude-sonnet-5-5",
+    openai: "gpt-5-mini",
+    gemini: "gemini-2.5-flash",
+  },
+  prices: {
+    anthropic: { input: 3, output: 15 },
+    openai: { input: 0.25, output: 2 },
+    gemini: { input: 0.3, output: 2.5 },
+  },
+  confidenceThreshold: 0.7,
+  samples: 3,
+  simulateElkDown: false,
+  usdToIdr: 16500,
+  cachedBaselines: {},
+};
+
+export const PROVIDER_LABEL: Record<ProviderId, string> = {
+  anthropic: "Claude (Anthropic)",
+  openai: "OpenAI / kompatibel OpenAI",
+  gemini: "Gemini (Google)",
+};
+
+export const MODEL_SUGGESTIONS: Record<ProviderId, string[]> = {
+  anthropic: ["claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"],
+  openai: ["gpt-5-mini", "gpt-5", "gpt-5-nano"],
+  gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"],
+};
+
