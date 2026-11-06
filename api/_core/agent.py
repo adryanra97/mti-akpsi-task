@@ -14,6 +14,8 @@ KRITERIA_SLA : dict
     Kriteria SLA yang dipakai pada mode insiden dan mitigasi.
 BATAS_HEADROOM : float
     Utilisasi (persen) di atas nilai ini membuat verdict paling tinggi Lolos Bersyarat.
+ANGGARAN_LLM_S : float
+    Batas waktu proses (detik) sebelum langkah LLM berikutnya memakai cadangan deterministik.
 LABEL_SUMBER : dict of str
     Label tampilan untuk setiap sumber daya pembatas.
 LABEL_VERDICT : dict of str
@@ -27,6 +29,7 @@ import json
 import math
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,6 +45,7 @@ from .twin import HasilSimulasi, Profil, Spesifikasi, benih, kalibrasi, kapasita
 REGISTRI = json.loads((Path(__file__).parent / "registry.json").read_text(encoding="utf-8"))
 KRITERIA_SLA = {"maxP95Ms": 800, "maxErrorRatePct": 1, "maxCpuPct": 85, "maxMemPct": 90}
 BATAS_HEADROOM = 75
+ANGGARAN_LLM_S = 150    # setelah sekian detik, langkah LLM berikutnya memakai cadangan deterministik
 
 LABEL_SUMBER = {
     "CPU": "CPU", "Memori": "Memori", "Jaringan": "Jaringan", "ThreadPool": "Thread pool",
@@ -205,13 +209,15 @@ class EstimatorPenalaran:
         dict
             ``ringkasan`` (indikator), ``skor`` (0 sampai 1), ``kesepakatan`` (0 sampai 1), dan ``alasan``.
         """
-        if self.agen.mode_llm:
+        if self.agen._llm_boleh("estimasi penalaran"):
             sampel = []
-            for _ in range(self.jumlahSampel):
-                try:
-                    sampel.append(self.agen.llm.terstruktur(EstimasiLLM, konteks))
-                except GagalLLM as e:
-                    self.agen.peringatan.append(f"Sebagian sampel estimasi gagal: {e}")
+            # Sampel diminta bersamaan agar waktu tunggu tidak berlipat sebanyak jumlah sampel.
+            with ThreadPoolExecutor(max_workers=self.jumlahSampel) as ex:
+                for f in [ex.submit(self.agen.llm.terstruktur, EstimasiLLM, konteks) for _ in range(self.jumlahSampel)]:
+                    try:
+                        sampel.append(f.result())
+                    except GagalLLM as e:
+                        self.agen.peringatan.append(f"Sebagian sampel estimasi gagal: {e}")
             if not sampel:
                 return {"ringkasan": acuan, "skor": 0.0, "kesepakatan": 0.0, "alasan": "Seluruh sampel gagal."}
             rata = lambda k: sum(getattr(s, k) for s in sampel) / len(sampel)
@@ -290,7 +296,12 @@ class AgenAnalisis:
         self.jejak: list[dict] = []
         self.langkah: list[LangkahAnalisis] = []
         self.status = "Diterima"
-        self.kunci_benih = json.dumps({k: permintaan.get(k) for k in ("layanan", "parameter", "insiden", "mitigasi")}, sort_keys=True)
+        # Seed tidak memuat daftar what-if: menambah atau mengurangi varian tidak boleh mengubah hasil beban normal dan puncak.
+        dasar = {k: permintaan.get(k) for k in ("layanan", "parameter", "insiden", "mitigasi")}
+        if isinstance(dasar.get("parameter"), dict):
+            dasar["parameter"] = {k: v for k, v in dasar["parameter"].items() if k != "whatIf"}
+        self.kunci_benih = json.dumps(dasar, sort_keys=True)
+        self.t_mulai = time.time()
         self.estimator = EstimatorPenalaran(self)
         self.alat = {
             "kueri_metrik_elk": StructuredTool.from_function(
@@ -305,6 +316,29 @@ class AgenAnalisis:
         }
 
     # ------------------------------------------------------------------ utilitas peristiwa
+    def _llm_boleh(self, tahap: str) -> bool:
+        """Memeriksa apakah panggilan LLM untuk suatu tahap masih boleh dilakukan.
+
+        Panggilan dibatalkan bila mode LLM tidak aktif atau waktu proses sudah melewati
+        ``ANGGARAN_LLM_S``, agar fungsi tidak dihentikan platform sebelum hasil terkirim.
+
+        Parameters
+        ----------
+        tahap : str
+            Nama tahap untuk pesan peringatan, misalnya ``"narasi"``.
+
+        Returns
+        -------
+        bool
+            ``True`` bila LLM boleh dipanggil.
+        """
+        if not self.mode_llm:
+            return False
+        if time.time() - self.t_mulai > ANGGARAN_LLM_S:
+            self.peringatan.append(f"Waktu proses melewati {ANGGARAN_LLM_S} detik; {tahap} memakai cadangan deterministik.")
+            return False
+        return True
+
     def _status(self, s: str):
         """Mengubah status permintaan dan membuat event status.
 
@@ -620,7 +654,7 @@ class AgenAnalisis:
                   "Menilai apakah opsi mitigasi menahan kondisi insiden dalam batas SLA.")
         rencana = {"ringkasanTujuan": tujuan, "waktuDisusun": iso(self.sekarang),
                    "langkah": [{"urutan": l.urutan, "deskripsi": l.deskripsi, "alat": l.alat, "acuan": l.kunci} for l in self.langkah]}
-        if not self.mode_llm:
+        if not self._llm_boleh("rencana"):
             return rencana
         daftar = "\n".join(f"- {l.kunci}: {l.deskripsi}" for l in self.langkah)
         alat = "\n".join(f"- {t.name}: {t.description}" for t in self.alat.values())
@@ -1017,7 +1051,7 @@ class AgenAnalisis:
         self._narasi_fallback = True
         templat = self._narasi_templat()
         self.verdict["narasi"] = templat
-        if not self.mode_llm:
+        if not self._llm_boleh("narasi"):
             return
         fakta = {"verdict": LABEL_VERDICT[self.verdict["status"]], "alasan": self.verdict["alasan"], "syarat": self.verdict["syarat"],
                  "pembatas": LABEL_SUMBER.get(self.pembatas) if self.pembatas else None, "penyebab": self.penyebab,

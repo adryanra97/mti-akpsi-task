@@ -15,6 +15,7 @@ ENV_KEY : dict of str
 from __future__ import annotations
 
 import os
+import threading
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -152,9 +153,26 @@ class LayananLLM:
         self.token_masuk = 0
         self.token_keluar = 0
         self._chat = None
+        self._kunci = threading.Lock()
 
     def _model(self):
         """Membuat (sekali) dan mengembalikan model chat LangChain sesuai penyedia.
+
+        Returns
+        -------
+        langchain_core.language_models.BaseChatModel
+            Model chat yang siap dipanggil.
+
+        Raises
+        ------
+        GagalLLM
+            Bila API key belum diisi atau penyedia tidak dikenal.
+        """
+        with self._kunci:
+            return self._buat_model()
+
+    def _buat_model(self):
+        """Membuat model chat bila belum ada; dipanggil di dalam kunci ``_kunci``.
 
         Returns
         -------
@@ -173,14 +191,14 @@ class LayananLLM:
             raise GagalLLM(f"{ENV_KEY.get(self.provider, 'API key')} belum diisi di environment variable.")
         if self.provider == "anthropic":
             from langchain_anthropic import ChatAnthropic
-            self._chat = ChatAnthropic(model=self.model, api_key=key, max_tokens=1200, timeout=45, max_retries=1)
+            self._chat = ChatAnthropic(model=self.model, api_key=key, max_tokens=1200, timeout=30, max_retries=1)
         elif self.provider == "openai":
             from langchain_openai import ChatOpenAI
             self._chat = ChatOpenAI(model=self.model, api_key=key, base_url=os.environ.get("OPENAI_BASE_URL") or None,
-                                    timeout=45, max_retries=1)
+                                    timeout=30, max_retries=1)
         elif self.provider == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
-            self._chat = ChatGoogleGenerativeAI(model=self.model, google_api_key=key, timeout=45, max_retries=1)
+            self._chat = ChatGoogleGenerativeAI(model=self.model, google_api_key=key, timeout=30, max_retries=1)
         else:
             raise GagalLLM(f"Penyedia LLM tidak dikenal: {self.provider}")
         return self._chat
@@ -193,10 +211,11 @@ class LayananLLM:
         msg : langchain_core.messages.AIMessage or None
             Pesan balasan model; ``usage_metadata`` dibaca bila ada.
         """
-        self.pengiriman += 1
         usage = getattr(msg, "usage_metadata", None) or {}
-        self.token_masuk += int(usage.get("input_tokens", 0) or 0)
-        self.token_keluar += int(usage.get("output_tokens", 0) or 0)
+        with self._kunci:  # dapat dipanggil bersamaan dari thread sampel estimasi
+            self.pengiriman += 1
+            self.token_masuk += int(usage.get("input_tokens", 0) or 0)
+            self.token_keluar += int(usage.get("output_tokens", 0) or 0)
 
     def terstruktur(self, skema: type[BaseModel], prompt: str):
         """Memanggil LLM dengan keluaran terstruktur sesuai skema Pydantic.

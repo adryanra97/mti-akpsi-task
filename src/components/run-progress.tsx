@@ -110,7 +110,7 @@ export function useCoreRun() {
           else if (ev.type === "done") final = { hasil: ev.hasil, tanda: ev.tanda };
         }
       }
-      if (!final) throw new Error("Koneksi ke Core Module terputus sebelum analisis selesai. Jalankan ulang analisis.");
+      if (!final) throw new Error("Koneksi ke Core Module terputus sebelum analisis selesai. Klik ajukan ulang; bila memakai mode LLM dan terus terulang, kurangi varian what-if atau beralih ke mode demo di Pengaturan.");
       await jsonOrError(
         await fetch(resultUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(final) }),
       );
