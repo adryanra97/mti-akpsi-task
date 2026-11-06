@@ -84,12 +84,12 @@ export function Sidebar({
 
   const content = (
     <div className="flex h-full flex-col bg-board text-board-ink">
-      <div className="flex items-center gap-2.5 px-5 pb-6 pt-5">
+      <div className="flex items-center gap-3 border-b border-board-line px-5 pb-6 pt-6">
         <img src="/icon.svg" alt="" width={28} height={28} />
-        <span className="font-wide text-[17px] font-bold tracking-tight">ServerAgent</span>
+        <span className="font-wide text-[18px] font-bold tracking-tight text-white">ServerAgent</span>
       </div>
 
-      <nav aria-label="Navigasi utama" className="flex-1 px-3">
+      <nav aria-label="Navigasi utama" className="flex-1 px-3 pt-5">
         <ul className="grid gap-0.5">
           {items.map((n) => {
             const active = isActive(n.href);
@@ -100,16 +100,16 @@ export function Sidebar({
                   href={n.href}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex items-center gap-3 rounded-md px-3 py-2 text-[14.5px] transition-colors",
+                    "relative flex min-h-11 items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14.5px] transition-colors",
                     active
-                      ? "bg-board-2 font-semibold text-white before:absolute before:inset-y-1.5 before:-left-3 before:w-1 before:rounded-r before:bg-amber"
+                      ? "bg-[#20538c] font-semibold text-white shadow-[inset_3px_0_0_#91c6ff]"
                       : "text-board-ink-2 hover:bg-board-2 hover:text-board-ink",
                   )}
                 >
                   <n.icon className="h-[18px] w-[18px]" aria-hidden />
                   <span className="flex-1">{n.label}</span>
                   {count > 0 && (
-                    <span className="rounded-full bg-amber px-1.5 text-[12px] font-bold leading-5 text-board">
+                    <span className="rounded-full bg-[#dceaff] px-2 text-[12px] font-bold leading-5 text-[#102b52]">
                       {count}
                       <span className="sr-only"> tugas menunggu</span>
                     </span>
@@ -121,7 +121,7 @@ export function Sidebar({
         </ul>
       </nav>
 
-      <div className="mx-3 mb-3 rounded-md border border-board-line px-3 py-2.5 text-[13px]">
+      <div className="mx-3 mb-4 rounded-xl border border-board-line bg-board-2/60 px-3.5 py-3 text-[13px]">
         <p className="text-board-ink-2">Mode analisis</p>
         <p className="font-medium">{mode}</p>
       </div>
@@ -135,7 +135,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={toggleTheme}
-            className="rounded-md p-2 text-board-ink-2 hover:bg-board-2 hover:text-board-ink"
+            className="rounded-lg p-2.5 text-board-ink-2 hover:bg-board-2 hover:text-board-ink"
             aria-label={theme === "dark" ? "Gunakan tema terang" : "Gunakan tema gelap"}
           >
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -144,7 +144,7 @@ export function Sidebar({
         <form action={logout}>
           <button
             type="submit"
-            className="mt-1 flex w-full items-center gap-3 rounded-md px-3 py-2 text-[14px] text-board-ink-2 hover:bg-board-2 hover:text-board-ink"
+            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[14px] text-board-ink-2 hover:bg-board-2 hover:text-board-ink"
           >
             <LogOut className="h-4 w-4" aria-hidden /> Keluar
           </button>
