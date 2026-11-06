@@ -11,10 +11,10 @@ export { clsx as cx };
 type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const btnBase =
-  "inline-flex items-center justify-center gap-2 rounded-md px-4 h-10 text-[14px] font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
+  "inline-flex items-center justify-center gap-2 rounded-lg px-4 min-h-10 text-[14px] font-semibold shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-accent/30 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap";
 const btnVariants: Record<BtnVariant, string> = {
   primary: "bg-primary text-primary-ink hover:bg-primary-hover",
-  secondary: "bg-surface text-ink border border-line-strong hover:bg-surface-2",
+  secondary: "bg-surface text-ink border border-line-strong hover:border-accent/50 hover:bg-accent-soft",
   ghost: "text-ink-2 hover:bg-sunken hover:text-ink",
   danger: "bg-fail text-white hover:opacity-90 dark:text-bg",
 };
@@ -109,17 +109,17 @@ export function Panel({
   id?: string;
 }) {
   return (
-    <section id={id} className={clsx("rounded-[10px] border border-line bg-surface", className)}>
+    <section id={id} className={clsx("rounded-2xl border border-line bg-surface shadow-[0_2px_12px_rgba(17,58,108,0.035)]", className)}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
-            {title && <h2 className="text-[17px]">{title}</h2>}
+            {title && <h2 className="text-[17px] font-bold tracking-tight">{title}</h2>}
             {description && <p className="mt-0.5 text-[13.5px] text-ink-3">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </header>
       )}
-      <div className={clsx("px-5 py-4", bodyClassName)}>{children}</div>
+      <div className={clsx("px-5 py-5 sm:px-6", bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -154,7 +154,7 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-6">
+    <div className="mb-7">
       {back && (
         <Link href={back.href} className="mb-3 inline-flex items-center gap-1 text-[13.5px] text-ink-3 hover:text-ink">
           <span aria-hidden>‹</span> {back.label}
@@ -162,7 +162,7 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
-          <h1 className="text-[30px] sm:text-[36px]">{title}</h1>
+          <h1 className="text-[29px] font-bold tracking-tight sm:text-[36px]">{title}</h1>
           {description && <p className="mt-1.5 text-ink-2">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -228,7 +228,7 @@ export function Field({
 }
 
 export const inputClass =
-  "block w-full rounded-lg border border-line-strong bg-surface px-3 h-10 text-[14.5px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 aria-[invalid=true]:border-fail aria-[invalid=true]:ring-fail/20";
+  "block w-full rounded-xl border border-line-strong bg-surface px-3.5 h-11 text-[14.5px] text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-[3px] focus:ring-accent/20 aria-[invalid=true]:border-fail aria-[invalid=true]:ring-fail/20";
 
 /**
  * Isian teks bergaya standar.
@@ -306,7 +306,7 @@ export function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?
     pass: "bg-pass-soft text-pass",
     fail: "bg-fail-soft text-fail",
   };
-  return <span className={clsx("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12.5px] font-medium", tones[tone])}>{children}</span>;
+  return <span className={clsx("inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12.5px] font-medium", tones[tone])}>{children}</span>;
 }
 
 /**
@@ -327,7 +327,7 @@ export function Tag({ children, tone = "neutral" }: { children: ReactNode; tone?
  */
 export function EmptyState({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-line-strong px-6 py-10 text-center">
+    <div className="rounded-2xl border border-dashed border-line-strong bg-surface-2 px-6 py-10 text-center">
       <p className="font-medium">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-md text-[14px] text-ink-3">{children}</div>}
       {action && <div className="mt-4 flex justify-center">{action}</div>}
@@ -371,7 +371,7 @@ export function Notice({
     pass: "border-pass/30 bg-pass-soft text-ink",
   };
   return (
-    <div className={clsx("flex gap-3 rounded-lg border px-4 py-3 text-[14px]", tones[tone])} role={tone === "fail" ? "alert" : "status"}>
+    <div className={clsx("flex gap-3 rounded-xl border px-4 py-3 text-[14px]", tones[tone])} role={tone === "fail" ? "alert" : "status"}>
       {icon && <div className="mt-0.5 shrink-0">{icon}</div>}
       <div className="min-w-0">
         {title && <p className="font-medium">{title}</p>}
