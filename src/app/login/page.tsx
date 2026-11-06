@@ -36,23 +36,23 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex min-h-dvh flex-col bg-bg lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(420px,1fr)]">
       {/* Formulir tampil lebih dulu di ponsel; di layar lebar menempel di kanan dan selalu terlihat utuh. */}
-      <section className="order-1 flex flex-col px-4 lg:order-2 py-6 sm:px-8 lg:sticky lg:top-0 lg:h-dvh lg:justify-center lg:overflow-y-auto lg:py-8" aria-label="Formulir masuk">
+      <section className="order-1 flex flex-col px-5 lg:order-2 py-8 sm:px-10 lg:sticky lg:top-0 lg:h-dvh lg:justify-center lg:overflow-y-auto lg:py-10" aria-label="Formulir masuk">
         <div className="mb-6 flex items-center gap-2.5 lg:hidden">
           <img src="/icon.svg" alt="" width={28} height={28} />
           <span className="font-wide text-[17px] font-bold tracking-tight">ServerAgent</span>
         </div>
-        <div className="mx-auto w-full max-w-[420px]">
+        <div className="mx-auto w-full max-w-[440px] rounded-2xl border border-line bg-surface p-5 shadow-[0_16px_48px_rgba(17,58,108,0.06)] sm:p-8">
           <LoginForm next={next ?? "/"} configProblems={authConfigProblems()} />
         </div>
       </section>
 
-      <section className="order-2 relative overflow-hidden bg-board lg:order-1 px-5 py-8 text-board-ink sm:px-10 lg:min-h-dvh lg:px-12 lg:py-10" aria-labelledby="hero-title">
+      <section className="order-2 relative overflow-hidden bg-board lg:order-1 px-6 py-10 text-board-ink sm:px-10 lg:min-h-dvh lg:px-14 lg:py-12" aria-labelledby="hero-title">
         <div className="hidden items-center gap-2.5 lg:flex">
           <img src="/icon.svg" alt="" width={30} height={30} />
           <span className="font-wide text-[18px] font-bold tracking-tight">ServerAgent</span>
         </div>
 
-        <h1 id="hero-title" className="font-wide max-w-[17ch] text-[30px] leading-[1.05] text-white sm:text-[40px] lg:mt-12 lg:text-[48px]">
+        <h1 id="hero-title" className="font-wide max-w-[18ch] text-[32px] leading-[1.12] tracking-tight text-white sm:text-[42px] lg:mt-16 lg:text-[50px]">
           Lolos ke Production, atau kembali ke Dev.
         </h1>
         <p className="mt-4 max-w-[54ch] text-[15px] leading-relaxed text-board-ink-2">
@@ -62,7 +62,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <div className="mt-8 hidden md:block">
           <div className="mb-2 flex items-baseline justify-between gap-4">
-            <p className="font-narrow text-[15px] font-semibold tracking-wide text-amber">Papan promosi: Dev ke Production</p>
+            <p className="text-[14px] font-semibold tracking-wide text-[#aad0ff]">Papan promosi: Dev ke Production</p>
             <p className="text-[12.5px] text-board-ink-2">Contoh tampilan</p>
           </div>
           <DepartureBoard rows={SAMPLE} caption="Contoh papan promosi release candidate" />
