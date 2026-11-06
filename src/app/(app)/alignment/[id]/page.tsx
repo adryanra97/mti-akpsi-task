@@ -11,10 +11,12 @@ import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/roles";
 import { getSession, getSignoff, listSessions } from "@/lib/data";
 import { defaultParams, latestResult, peakSummary } from "@/lib/domain";
-import { serviceEntry } from "@/lib/services";
+import { effectiveModel } from "@/lib/services";
+import { getSettings } from "@/lib/settings";
 import { KeyValue, Notice, PageHeader, Panel, Tag, cx } from "@/components/ui";
 import { VerdictBadge, VerdictHero } from "@/components/verdict";
 import { ResultDetails } from "@/components/result-details";
+import { RecalibrateHint } from "@/components/recalibrate-hint";
 import { StatusHistory } from "@/components/status-history";
 import { Workbench } from "./workbench";
 import { DecisionForm } from "./decision-form";
@@ -178,8 +180,11 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
   ];
 
   // Verdict, sumber daya pembatas, dan narasi tampil lebih dulu bila sudah ada hasil (NFR-08).
-  const twin = serviceEntry(s.service)?.model;
-  const resultFirst = Boolean(run) && (s.status === "Peninjauan" || closed);
+  const twin = effectiveModel(s.service, (await getSettings()).twinOverrides);
+  // Bila sudah ada hasil, panel parameter selalu di bawah hasil. Posisinya tidak berpindah saat
+  // "uji varian lain" mengembalikan status ke Pengisian Parameter, sehingga formulir tidak dibuat
+  // ulang di tengah "Simpan dan ajukan analisis".
+  const resultFirst = Boolean(run);
 
   const paramsPanel = (
     <Panel
@@ -197,6 +202,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
         needsRun={needsRun}
         hasRuns={s.runs.length > 0}
         waiting={s.status === "MenungguHasil"}
+        canSaveAndRun={can(user.role, "alignment.run") && open}
         range={twin?.statusAktif ? { min: twin.tpsMinTerkalibrasi, max: twin.tpsMaksTerkalibrasi } : null}
       />
     </Panel>
@@ -302,6 +308,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
               </Notice>
             )}
             <VerdictHero result={run} />
+            {!closed && <RecalibrateHint result={run} canManage={can(user.role, "settings.manage")} />}
 
             {/* Keputusan adalah tindakan utama Technical Lead saat peninjauan: diletakkan tepat setelah verdict. */}
             {s.status === "Peninjauan" &&

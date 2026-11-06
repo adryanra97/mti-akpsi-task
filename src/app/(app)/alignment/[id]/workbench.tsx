@@ -118,6 +118,7 @@ export function Workbench({
   hasRuns,
   waiting,
   range,
+  canSaveAndRun,
 }: {
   sessionId: string;
   params: AlignmentParams;
@@ -129,6 +130,7 @@ export function Workbench({
   hasRuns: boolean;
   waiting: boolean;
   range: { min: number; max: number } | null;
+  canSaveAndRun: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(!hasSavedParams && canEdit);
@@ -358,7 +360,7 @@ export function Workbench({
       </Group>
 
       <div className={cx("sticky bottom-0 -mx-5 flex flex-wrap gap-2 border-t border-line bg-surface/95 px-5 py-3 backdrop-blur")}>
-        {canRun && (
+        {canSaveAndRun && (
           <Button type="submit" name="intent" value="run" disabled={pending}>
             {pending ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden /> : <Play className="h-4 w-4" aria-hidden />}
             Simpan dan ajukan analisis

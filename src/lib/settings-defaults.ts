@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   simulateElkDown: false,
   usdToIdr: 16500,
   cachedBaselines: {},
+  twinOverrides: {},
 };
 
 export const PROVIDER_LABEL: Record<ProviderId, string> = {

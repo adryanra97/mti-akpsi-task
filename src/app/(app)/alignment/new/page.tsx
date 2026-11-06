@@ -8,7 +8,8 @@ import { can } from "@/lib/roles";
 import { listSessions } from "@/lib/data";
 import { PageHeader, Panel } from "@/components/ui";
 import { ScheduleForm } from "./schedule-form";
-import { SERVICES } from "@/lib/services";
+import { SERVICES, effectiveModel } from "@/lib/services";
+import { getSettings } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Jadwalkan sesi alignment" };
 
@@ -22,7 +23,7 @@ export const metadata: Metadata = { title: "Jadwalkan sesi alignment" };
 export default async function NewSession() {
   const user = await requireUser();
   if (!can(user.role, "alignment.schedule")) redirect("/alignment");
-  const sessions = await listSessions();
+  const [sessions, settings] = await Promise.all([listSessions(), getSettings()]);
   const latest = Object.fromEntries(
     SERVICES.map((svc) => {
       const last = sessions.filter((s) => s.service === svc.nama).sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt))[0];
@@ -37,7 +38,7 @@ export default async function NewSession() {
         back={{ href: "/alignment", label: "Alignment rilis" }}
       />
       <Panel className="max-w-2xl">
-        <ScheduleForm services={SERVICES.map((s) => ({ name: s.nama, twin: s.model.statusAktif }))} latest={latest} />
+        <ScheduleForm services={SERVICES.map((s) => ({ name: s.nama, twin: Boolean(effectiveModel(s.nama, settings.twinOverrides)?.statusAktif) }))} latest={latest} />
       </Panel>
     </>
   );

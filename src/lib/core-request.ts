@@ -85,7 +85,7 @@ export function verifyCoreResult(text: string, signature: string): AnalysisResul
  * -------
  * Record<string, unknown>
  *     Mode, penyedia, model, harga, kurs, ambang keyakinan, jumlah sampel, simulasi ELK
- *     tidak tersedia, dan baseline tersimpan.
+ *     tidak tersedia, baseline tersimpan, dan hasil kalibrasi ulang model digital twin.
  */
 function settingsClaims(s: AppSettings, service: string) {
   return {
@@ -98,6 +98,8 @@ function settingsClaims(s: AppSettings, service: string) {
     sampel: s.samples,
     simulasiElkMati: s.simulateElkDown,
     baselineTersimpan: s.cachedBaselines[service] ?? null,
+    // Hasil kalibrasi ulang model (bila ada); ditandatangani bersama permintaan sehingga tepercaya.
+    modelDigitalTwin: s.twinOverrides?.[service] ?? null,
   };
 }
 

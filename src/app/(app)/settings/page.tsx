@@ -1,5 +1,5 @@
 /**
- * Halaman Pengaturan (khusus Technical Lead) beserta status database dan log audit.
+ * Halaman Pengaturan (khusus Technical Lead): mode analisis, model digital twin, status database, dan log audit.
  */
 import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth";
@@ -10,6 +10,8 @@ import { KeyValue, PageHeader, Panel, Tag } from "@/components/ui";
 import { ResetData, SettingsForm } from "./settings-form";
 import { fmtDate } from "@/lib/format";
 import { ROLE_LABEL } from "@/lib/roles";
+import { SERVICES, effectiveModel } from "@/lib/services";
+import { ModelCalibration } from "./model-calibration";
 
 export const metadata: Metadata = { title: "Pengaturan" };
 
@@ -44,6 +46,18 @@ export default async function SettingsPage() {
           </Panel>
         </div>
       </div>
+
+      <Panel
+        id="model-digital-twin"
+        className="mt-6 scroll-mt-6"
+        title="Model digital twin"
+        description="Versi, tanggal kalibrasi, dan rentang TPS terkalibrasi per layanan. Beban di luar rentang berstatus Tidak Dapat Dinilai."
+        bodyClassName="p-0"
+      >
+        <ModelCalibration
+          rows={SERVICES.map((sv) => ({ service: sv.nama, model: effectiveModel(sv.nama, settings.twinOverrides)!, recalibrated: Boolean(settings.twinOverrides?.[sv.nama]) }))}
+        />
+      </Panel>
 
       <Panel id="audit" className="mt-6 scroll-mt-6" title="Log audit" description="50 aktivitas terakhir" bodyClassName="p-0">
         <div className="overflow-x-auto">

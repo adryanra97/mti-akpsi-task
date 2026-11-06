@@ -60,6 +60,8 @@ Aturan penjurusan (JalurPenjurusan):
 - Beban normal atau puncak di luar rentang TPS terkalibrasi, atau model tidak aktif, menghentikan analisis dengan verdict **Tidak Dapat Dinilai**. Varian what-if di luar rentang hanya menandai varian itu sendiri sebagai Tidak Dapat Dinilai; beban normal dan puncak tetap dinilai.
 - Uji what-if adalah pengali beban **normal** (2×, 3×, 5×, 10×).
 
+**Kalibrasi ulang model.** Technical Lead dapat memperluas rentang TPS terkalibrasi atau mengaktifkan model yang belum aktif di **Pengaturan → Model digital twin**. Pada prototipe ini kalibrasi disimulasikan: versi model naik (misalnya `dt-notifikasi-1.2` menjadi `1.3`), tanggal kalibrasi diperbarui, sumber data dicatat di log audit, dan model baru dikirim ke Core Module di dalam token permintaan bertanda tangan. Hasil Tidak Dapat Dinilai menampilkan tautan langsung ke langkah ini.
+
 Setiap hasil menampilkan versi dan tanggal kalibrasi model, dan verdict, sumber daya pembatas, serta narasi tampil paling atas.
 
 ### Mode analisis

@@ -289,6 +289,11 @@ class AgenAnalisis:
         self.sekarang = sekarang or datetime.now(timezone.utc)
         self.layanan = permintaan["layanan"]
         self.reg = registri_layanan(self.layanan)
+        timpa = self.pengaturan.get("modelDigitalTwin")
+        if self.reg and isinstance(timpa, dict):
+            # Hasil kalibrasi ulang dari Dashboard (bagian dari token bertanda tangan) menimpa model registri.
+            izin = {"versiModel", "statusAktif", "tanggalKalibrasi", "tpsMinTerkalibrasi", "tpsMaksTerkalibrasi", "cakupanKomponen"}
+            self.reg = {**self.reg, "model": {**self.reg["model"], **{k: v for k, v in timpa.items() if k in izin}}}
         self.ambang = float(self.pengaturan.get("ambang", 0.7))
         self.llm = LayananLLM(self.pengaturan.get("provider", "anthropic"), self.pengaturan.get("model", ""),
                               self.pengaturan.get("harga", {"input": 3, "output": 15}), float(self.pengaturan.get("kurs", 16500)))

@@ -11,6 +11,7 @@ import { INCIDENT_TYPE_LABEL, mttrMinutes, peakSummary, selectedMitigation } fro
 import { KeyValue, Notice, PageHeader, Panel, Tag, cx } from "@/components/ui";
 import { IndicatorTable, VerdictBadge, VerdictHero } from "@/components/verdict";
 import { ResultDetails } from "@/components/result-details";
+import { RecalibrateHint } from "@/components/recalibrate-hint";
 import { StatusHistory } from "@/components/status-history";
 import { Stepper } from "@/components/stepper";
 import { AllTestedButton, CopySummary, FinalizeForm, MitigationLab, ReproRunner } from "./incident-tools";
@@ -209,6 +210,7 @@ export default async function IncidentPage({ params, searchParams }: { params: P
                 result={inc.repro}
                 title={inc.repro.statusReproduksi === "Tereproduksi" ? "Tereproduksi: insiden akan terjadi lagi pada spesifikasi saat ini" : "Insiden belum tereproduksi pada digital twin"}
               />
+              {!documented && <RecalibrateHint result={inc.repro} canManage={can(user.role, "settings.manage")} />}
               {inc.repro.statusReproduksi !== "Tereproduksi" && (
                 <Notice tone="info" title="Rekomendasi">
                   Kalibrasi ulang model digital twin dengan data periode insiden. Laporan tetap dapat disusun.

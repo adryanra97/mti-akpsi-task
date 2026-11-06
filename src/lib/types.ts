@@ -432,6 +432,8 @@ export interface AppSettings {
   simulateElkDown: boolean;
   usdToIdr: number;
   cachedBaselines: Record<string, Baseline>;
+  /** Hasil kalibrasi ulang ModelDigitalTwin per layanan, menimpa nilai bawaan registri. */
+  twinOverrides?: Record<string, Partial<DigitalTwinModel>>;
   /** Versi data contoh; data contoh lama diganti otomatis bila versinya lebih rendah. */
   seedVersion?: number;
 }

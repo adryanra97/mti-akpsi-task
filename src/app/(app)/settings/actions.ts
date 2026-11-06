@@ -1,7 +1,8 @@
 "use server";
 
 /**
- * Server action Pengaturan (khusus Technical Lead): mode analisis, penyedia LLM, uji koneksi, dan reset data contoh.
+ * Server action Pengaturan (khusus Technical Lead): mode analisis, penyedia LLM, uji koneksi,
+ * kalibrasi ulang model digital twin, dan reset data contoh.
  */
 import { revalidatePath } from "next/cache";
 import { audit, requirePermission } from "@/lib/auth";
@@ -9,6 +10,7 @@ import { getSettings, providerKeyConfigured, saveSettings, PROVIDER_LABEL } from
 import { signCoreToken } from "@/lib/core-request";
 import { resetAll } from "@/lib/db";
 import type { ProviderId } from "@/lib/types";
+import { DEFAULT_COVERAGE, effectiveModel, nextModelVersion, serviceEntry } from "@/lib/services";
 
 export interface SettingsState {
   ok?: string;
@@ -114,4 +116,68 @@ export async function resetDemoData(): Promise<{ ok: boolean; message: string }>
   await audit(user, "Mengembalikan data contoh", "Database");
   revalidatePath("/", "layout");
   return { ok: true, message: "Data contoh sudah dipulihkan." };
+}
+
+/** Batas atas rentang kalibrasi yang dapat diisi pada prototipe ini. */
+const MAX_CALIBRATED_TPS = 1000;
+
+/**
+ * Kalibrasi ulang ModelDigitalTwin sebuah layanan (disimulasikan pada prototipe).
+ *
+ * Di sistem nyata langkah ini mencocokkan model dengan data ELK periode beban tinggi atau
+ * hasil load test. Di sini rentang TPS terkalibrasi diperluas, model diaktifkan bila belum
+ * aktif, versi model dinaikkan, tanggal kalibrasi diperbarui, lalu dicatat di log audit.
+ * Analisis berikutnya memakai model hasil kalibrasi ulang.
+ *
+ * Parameters
+ * ----------
+ * service : string
+ *     Nama layanan (diikat dengan bind).
+ * _ : SettingsState
+ *     State sebelumnya (tidak dipakai).
+ * f : FormData
+ *     tpsMax (batas atas baru) dan source (sumber data kalibrasi, wajib).
+ *
+ * Returns
+ * -------
+ * Promise<SettingsState>
+ *     Pesan berhasil berisi versi model baru, atau galat validasi per field.
+ */
+export async function recalibrateModel(service: string, _: SettingsState, f: FormData): Promise<SettingsState> {
+  const user = await requirePermission("settings.manage");
+  const entry = serviceEntry(service);
+  if (!entry) return { error: "Layanan tidak dikenal." };
+  const s = await getSettings();
+  const current = effectiveModel(service, s.twinOverrides)!;
+  const raw = String(f.get("tpsMax") ?? "").replace(",", ".").trim();
+  const tpsMax = Number(raw);
+  const source = String(f.get("source") ?? "").trim().slice(0, 200);
+  const min = current.statusAktif ? current.tpsMinTerkalibrasi : 1;
+  const errors: Record<string, string> = {};
+  if (!raw || !Number.isInteger(tpsMax)) errors.tpsMax = "Isi batas atas rentang dalam bilangan bulat TPS.";
+  else if (current.statusAktif && tpsMax < current.tpsMaksTerkalibrasi) errors.tpsMax = `Batas atas tidak boleh lebih kecil dari rentang saat ini (${current.tpsMaksTerkalibrasi} TPS).`;
+  else if (tpsMax <= min) errors.tpsMax = `Batas atas harus lebih dari ${min} TPS.`;
+  else if (tpsMax > MAX_CALIBRATED_TPS) errors.tpsMax = `Batas atas maksimal ${MAX_CALIBRATED_TPS} TPS pada prototipe ini.`;
+  if (!source) errors.source = "Tulis sumber data kalibrasi, misalnya load test atau periode data ELK yang dipakai.";
+  if (Object.keys(errors).length) return { errors };
+
+  const activating = !current.statusAktif;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+  const updated = {
+    versiModel: nextModelVersion(current.versiModel, activating),
+    statusAktif: true,
+    tanggalKalibrasi: today,
+    tpsMinTerkalibrasi: min,
+    tpsMaksTerkalibrasi: tpsMax,
+    cakupanKomponen: current.cakupanKomponen.length ? current.cakupanKomponen : DEFAULT_COVERAGE,
+  };
+  await saveSettings({ ...s, twinOverrides: { ...(s.twinOverrides ?? {}), [service]: updated } });
+  await audit(
+    user,
+    activating ? "Mengaktifkan model digital twin" : "Mengkalibrasi ulang model digital twin",
+    service,
+    `${current.versiModel} -> ${updated.versiModel}, rentang ${min}-${tpsMax} TPS. Sumber: ${source}`,
+  );
+  revalidatePath("/", "layout");
+  return { ok: `${service}: model ${updated.versiModel} aktif, rentang ${min} sampai ${tpsMax} TPS, dikalibrasi ${today}.` };
 }
