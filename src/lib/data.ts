@@ -1,7 +1,11 @@
 import "server-only";
 /**
  * Akses data tingkat aplikasi: daftar dan detail objek, tugas per peran, dan lencana navigasi.
+ *
+ * Fungsi baca dibungkus `cache()` React sehingga layout dan halaman dalam satu permintaan
+ * berbagi hasil query yang sama, alih-alih membaca database berulang kali.
  */
+import { cache } from "react";
 import { all, get, put } from "./db";
 import { transition } from "./domain";
 import type { AlignmentSession, AuditEntry, Incident, ReportEntry, Role, SignoffDoc } from "./types";
@@ -36,7 +40,7 @@ async function openIfDue(s: AlignmentSession): Promise<AlignmentSession> {
  * -------
  * Promise<AlignmentSession[]>
  */
-export const listSessions = async () => Promise.all((await all<AlignmentSession>("sa_sessions")).map(openIfDue));
+export const listSessions = cache(async () => Promise.all((await all<AlignmentSession>("sa_sessions")).map(openIfDue)));
 /**
  * Satu sesi alignment, dibuka otomatis bila jadwalnya sudah tiba.
  *
@@ -49,10 +53,10 @@ export const listSessions = async () => Promise.all((await all<AlignmentSession>
  * -------
  * Promise<AlignmentSession | null>
  */
-export const getSession = async (id: string) => {
+export const getSession = cache(async (id: string) => {
   const s = await get<AlignmentSession>("sa_sessions", id);
   return s ? openIfDue(s) : null;
-};
+});
 /**
  * Seluruh kasus insiden.
  *
@@ -60,7 +64,7 @@ export const getSession = async (id: string) => {
  * -------
  * Promise<Incident[]>
  */
-export const listIncidents = () => all<Incident>("sa_incidents");
+export const listIncidents = cache(() => all<Incident>("sa_incidents"));
 /**
  * Satu kasus insiden.
  *
@@ -73,7 +77,7 @@ export const listIncidents = () => all<Incident>("sa_incidents");
  * -------
  * Promise<Incident | null>
  */
-export const getIncident = (id: string) => get<Incident>("sa_incidents", id);
+export const getIncident = cache((id: string) => get<Incident>("sa_incidents", id));
 /**
  * Seluruh dokumen sign-off.
  *
@@ -81,7 +85,7 @@ export const getIncident = (id: string) => get<Incident>("sa_incidents", id);
  * -------
  * Promise<SignoffDoc[]>
  */
-export const listSignoffs = () => all<SignoffDoc>("sa_signoffs");
+export const listSignoffs = cache(() => all<SignoffDoc>("sa_signoffs"));
 /**
  * Satu dokumen sign-off.
  *
@@ -94,7 +98,7 @@ export const listSignoffs = () => all<SignoffDoc>("sa_signoffs");
  * -------
  * Promise<SignoffDoc | null>
  */
-export const getSignoff = (id: string) => get<SignoffDoc>("sa_signoffs", id);
+export const getSignoff = cache((id: string) => get<SignoffDoc>("sa_signoffs", id));
 /**
  * Seluruh entri riwayat laporan.
  *
@@ -102,7 +106,7 @@ export const getSignoff = (id: string) => get<SignoffDoc>("sa_signoffs", id);
  * -------
  * Promise<ReportEntry[]>
  */
-export const listReports = () => all<ReportEntry>("sa_reports");
+export const listReports = cache(() => all<ReportEntry>("sa_reports"));
 /**
  * Seluruh entri log audit, terbaru lebih dulu.
  *
@@ -110,7 +114,7 @@ export const listReports = () => all<ReportEntry>("sa_reports");
  * -------
  * Promise<AuditEntry[]>
  */
-export const listAudit = () => all<AuditEntry>("sa_audit");
+export const listAudit = cache(() => all<AuditEntry>("sa_audit"));
 
 /**
  * Mengurutkan sesi dari jadwal terbaru.
@@ -151,7 +155,7 @@ export interface Todo {
  *     keputusan dan insiden yang perlu eskalasi. PM: sign-off yang menunggu keputusan.
  *     IE: insiden yang belum terdokumentasi.
  */
-export async function todosFor(role: Role): Promise<Todo[]> {
+export const todosFor = cache(async function todosFor(role: Role): Promise<Todo[]> {
   const [sessions, signoffs, incidents] = await Promise.all([listSessions(), listSignoffs(), listIncidents()]);
   const out: Todo[] = [];
   if (role === "QA" || role === "TL") {
@@ -178,7 +182,7 @@ export async function todosFor(role: Role): Promise<Todo[]> {
       out.push({ href: `/incidents/${i.id}`, kind: "incident", title: `Tangani ${i.code}: ${i.data.title}`, detail: i.data.service });
   }
   return out;
-}
+});
 
 /**
  * Jumlah tugas per bagian untuk lencana di navigasi.

@@ -12,7 +12,8 @@ import { ButtonLink, EmptyState, Notice, PageHeader, Panel, Select, Input, Tag, 
 import { VerdictBadge, VerdictIcon, VERDICT_TONE } from "@/components/verdict";
 import { VERDICT_LABEL } from "@/lib/verdict";
 import { fmtDate, fmtNum } from "@/lib/format";
-import { CpuTrend, IncidentBars, type CpuSeries } from "./trend-charts";
+import type { CpuSeries } from "./trend-charts";
+import { LazyCpuTrend, LazyIncidentBars } from "@/components/lazy-charts";
 import type { AlignmentSession, Verdict } from "@/lib/types";
 import { latestResult, peakSummary } from "@/lib/domain";
 
@@ -188,7 +189,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         <Panel title="CPU saat beban puncak per cycle" description="Indikator sumber daya utama per rilis, dalam persen kapasitas">
           {cpuSeries.length ? (
             <>
-              <CpuTrend series={cpuSeries} />
+              <LazyCpuTrend series={cpuSeries} />
               <details className="mt-2 text-[13px]">
                 <summary className="cursor-pointer text-accent">Tampilkan sebagai tabel</summary>
                 <table className="mt-2 w-full">
@@ -219,7 +220,7 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
         </Panel>
 
         <Panel title="Jumlah insiden per rilis" description="Insiden setelah go-live atau rollout">
-          {incData.length ? <IncidentBars data={incData} /> : <p className="text-[14px] text-ink-3">Tidak ada insiden pada filter ini.</p>}
+          {incData.length ? <LazyIncidentBars data={incData} /> : <p className="text-[14px] text-ink-3">Tidak ada insiden pada filter ini.</p>}
         </Panel>
       </div>
 

@@ -5,7 +5,7 @@
 import type { AnalysisResult, StepSummary } from "@/lib/types";
 import { KeyValue, Notice, Panel } from "./ui";
 import { CapacityRunway, IndicatorTable, TraceList } from "./verdict";
-import { TrajectoryChart } from "./trajectory-chart";
+import { LazyTrajectoryChart } from "./lazy-charts";
 import { fmtDate, fmtIdr, fmtNum } from "@/lib/format";
 import { LIMITING_LABEL } from "@/lib/verdict";
 import { peakSummary } from "@/lib/domain";
@@ -115,7 +115,7 @@ export function ResultDetails({ r, showRunway = true }: { r: AnalysisResult; sho
 
       {r.langkah.some((l) => l.deretWaktu?.length) && (
         <Panel title="Trajektori sumber daya" description="Deret waktu dari digital twin berbasis simulasi kejadian diskret (SimPy)">
-          <TrajectoryChart steps={r.langkah} />
+          <LazyTrajectoryChart steps={r.langkah} />
         </Panel>
       )}
 

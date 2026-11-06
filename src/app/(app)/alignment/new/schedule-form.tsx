@@ -35,12 +35,8 @@ export function ScheduleForm({
   const sug = latest[service];
   const e = state.errors ?? {};
   const svc = services.find((s) => s.name === service);
-  const defaultDate = (() => {
-    const d = new Date(Date.now() + 2 * 86400000);
-    d.setHours(14, 0, 0, 0);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T14:00`;
-  })();
+  // Selalu dihitung dalam WIB agar server dan browser menghasilkan nilai yang sama (tanpa galat hydration).
+  const defaultDate = `${new Date(Date.now() + 2 * 86400000).toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })}T14:00`;
 
   return (
     <form onSubmit={submitWith(action)} className="grid gap-4" noValidate>

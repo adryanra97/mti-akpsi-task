@@ -4,6 +4,7 @@ import "server-only";
  *
  * Hanya untuk server; API key tidak pernah disimpan di sini dan hanya dibaca dari environment variable.
  */
+import { cache } from "react";
 import { get, put } from "./db";
 import type { AppSettings, ProviderId } from "./types";
 import { DEFAULT_SETTINGS, RETIRED_MODELS } from "./settings-defaults";
@@ -39,7 +40,7 @@ export function providerKeyConfigured(p: ProviderId) {
  * Promise<AppSettings>
  *     Pengaturan lengkap.
  */
-export async function getSettings(): Promise<AppSettings> {
+export const getSettings = cache(async function getSettings(): Promise<AppSettings> {
   const s = await get<AppSettings & { id: string }>("sa_settings", "app");
   const out = { ...DEFAULT_SETTINGS, ...(s ?? {}) };
   // Model yang sudah dihentikan penyedia diganti otomatis beserta harganya.
@@ -53,7 +54,7 @@ export async function getSettings(): Promise<AppSettings> {
     }
   }
   return out;
-}
+});
 
 /**
  * Menyimpan pengaturan aplikasi.

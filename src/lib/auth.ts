@@ -2,6 +2,7 @@ import "server-only";
 /**
  * Otentikasi dan otorisasi di server: pengguna aktif, pemeriksaan izin, dan log audit.
  */
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { COOKIE, verifySession, type SessionPayload } from "./session";
@@ -17,10 +18,10 @@ import type { AuditEntry } from "./types";
  * Promise<SessionPayload | null>
  *     Identitas pengguna, atau null bila belum login.
  */
-export async function currentUser(): Promise<SessionPayload | null> {
+export const currentUser = cache(async function currentUser(): Promise<SessionPayload | null> {
   const jar = await cookies();
   return verifySession(jar.get(COOKIE)?.value);
-}
+});
 
 /**
  * Pengguna yang sedang login; mengalihkan ke /login bila belum login.

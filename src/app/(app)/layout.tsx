@@ -1,7 +1,10 @@
 /**
- * Tata letak halaman setelah login: navigasi samping, banner status database, dan area isi.
+ * Tata letak halaman setelah login: bilah progres navigasi, navigasi samping, banner status
+ * database, dan area isi.
  */
+import { Suspense } from "react";
 import { Database } from "lucide-react";
+import { RouteProgress } from "@/components/route-progress";
 import { Sidebar } from "@/components/sidebar";
 import { requireUser } from "@/lib/auth";
 import { navBadges } from "@/lib/data";
@@ -32,6 +35,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-dvh">
+      {/* Suspense hanya membungkus bilah progres (useSearchParams), bukan isi halaman. */}
+      <Suspense fallback={null}>
+        <RouteProgress />
+      </Suspense>
       <Sidebar user={user} badges={badges} mode={mode} />
       <div className="overflow-x-clip lg:pl-[248px]">
         {kind === "memory" && (

@@ -67,6 +67,14 @@ async function connect(): Promise<DbState> {
       query: async (text, params = []) => (await pg.query(text, params)).rows as Record<string, unknown>[],
     };
   }
+  // Jalur cepat: bila data contoh versi terbaru sudah ada, tabel pasti sudah dibuat.
+  // Satu query ini menggantikan tujuh query pemeriksaan tabel pada setiap cold start serverless.
+  try {
+    const rows = await state.query(`select data from sa_settings where id = 'app'`);
+    if (rows.length > 0 && ((rows[0].data as { seedVersion?: number }).seedVersion ?? 0) >= SEED_VERSION) return state;
+  } catch {
+    // Tabel belum ada: lanjut ke pembuatan tabel dan pengisian data contoh.
+  }
   for (const t of TABLES) {
     await state.query(
       `create table if not exists ${t} (id text primary key, data jsonb not null, created_at timestamptz not null default now())`,
