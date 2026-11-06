@@ -3,7 +3,9 @@
  *
  * Halaman ini publik, sehingga papan memakai contoh ilustratif, bukan data asli.
  */
-import type { Metadata } from "next";\nimport Link from "next/link";\nimport { ArrowUpRight, PlayCircle } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowUpRight, PlayCircle } from "lucide-react";
 import { LoginForm } from "./login-form";
 import { authConfigProblems } from "@/lib/auth-config";
 import { DepartureBoard, type BoardRow } from "@/components/board";
