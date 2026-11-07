@@ -11,6 +11,8 @@ SISTEM : str
     Pesan sistem untuk semua panggilan LLM.
 ENV_KEY : dict of str
     Nama environment variable API key per penyedia.
+ENV_KEY_CADANGAN : dict of str
+    Nama cadangan yang juga dikenali, misalnya ``GOOGLE_API_KEY`` untuk Gemini.
 """
 from __future__ import annotations
 
@@ -91,6 +93,7 @@ class GagalLLM(Exception):
 
 
 ENV_KEY = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
+ENV_KEY_CADANGAN = {"gemini": "GOOGLE_API_KEY"}  # nama yang dipakai contoh resmi Google
 
 
 def _pesan_galat(e: Exception, provider: str, model: str) -> str:
@@ -112,13 +115,30 @@ def _pesan_galat(e: Exception, provider: str, model: str) -> str:
         mengganti nama model di Pengaturan.
     """
     teks = str(e)
-    if "NOT_FOUND" in teks or "404" in teks or "not_found" in teks.lower() or "does not exist" in teks.lower():
+    low = teks.lower()
+    asli = f" (pesan asli: {teks[:220]})"
+    if type(e).__name__ in ("ProxyError", "ConnectError", "ConnectTimeout", "ReadTimeout") or "timed out" in low or "connection" in low:
+        return f"Server {provider} tidak dapat dihubungi dari Core Module (jaringan atau batas waktu). Coba lagi.{asli}"
+    if "api_key_invalid" in low or "api key not valid" in low or "invalid api key" in low or "incorrect api key" in low:
+        return f"API key {provider} tidak valid. Salin ulang key tanpa spasi atau tanda kutip, simpan di Vercel, lalu redeploy."
+    if "service_disabled" in low or "has not been used in project" in low or "it is disabled" in low:
+        return ("Generative Language API belum diaktifkan di project Google Cloud pemilik API key. Aktifkan di "
+                "console.cloud.google.com/apis/library/generativelanguage.googleapis.com, tunggu beberapa menit, lalu uji lagi.")
+    if "referer" in low or "referrer" in low or "api_key_ip_address_blocked" in low or "api_key_service_blocked" in low or "api_key_android" in low or "api_key_ios" in low:
+        return ("API key dibatasi (application restrictions atau API restrictions). Di Google Cloud Console > Credentials, "
+                "set Application restrictions ke None dan izinkan Generative Language API, lalu uji lagi.")
+    if "location is not supported" in low or "user location" in low:
+        return f"Lokasi server tidak didukung {provider}. Ganti region Vercel Function (misalnya sin1 atau iad1).{asli}"
+    if "limit: 0" in low or "free_tier" in low or "free tier" in low:
+        return (f"Kuota gratis untuk model '{model}' tidak tersedia atau sudah habis. Coba model lain di Pengaturan "
+                f"(misalnya gemini-flash-latest) atau aktifkan billing di project Google Cloud.{asli}")
+    if "not_found" in low or " 404" in teks or teks.startswith("404") or "does not exist" in low or "is not found" in low:
         return (f"Model '{model}' tidak tersedia di {provider} (mungkin sudah dihentikan). "
                 "Ganti nama model di Pengaturan, lalu uji koneksi lagi.")
-    if "401" in teks or "403" in teks or "API key" in teks or "PERMISSION_DENIED" in teks:
-        return f"API key {provider} ditolak. Periksa environment variable API key di Vercel, lalu redeploy."
-    if "429" in teks or "RESOURCE_EXHAUSTED" in teks or "rate" in teks.lower():
-        return f"Kuota atau batas laju {provider} habis. Coba lagi beberapa saat lagi."
+    if "429" in teks or "resource_exhausted" in low or "rate limit" in low:
+        return f"Kuota atau batas laju {provider} habis. Coba lagi beberapa saat lagi.{asli}"
+    if "401" in teks or "403" in teks or "permission_denied" in low or "unauthenticated" in low:
+        return f"Permintaan ke {provider} ditolak.{asli}"
     return teks[:300]
 
 
@@ -186,7 +206,7 @@ class LayananLLM:
         """
         if self._chat is not None:
             return self._chat
-        key = os.environ.get(ENV_KEY.get(self.provider, ""), "")
+        key = (os.environ.get(ENV_KEY.get(self.provider, ""), "") or os.environ.get(ENV_KEY_CADANGAN.get(self.provider, ""), "")).strip().strip('"').strip("'")
         if not key:
             raise GagalLLM(f"{ENV_KEY.get(self.provider, 'API key')} belum diisi di environment variable.")
         if self.provider == "anthropic":

@@ -35,7 +35,7 @@ export const PROVIDER_LABEL: Record<ProviderId, string> = {
 export const MODEL_SUGGESTIONS: Record<ProviderId, string[]> = {
   anthropic: ["claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5-5", "claude-haiku-5-5"],
   openai: ["gpt-5-mini", "gpt-5", "gpt-5.6-sol"],
-  gemini: ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro"],
+  gemini: ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"],
 };
 
 
@@ -49,5 +49,6 @@ export const RETIRED_MODELS: Record<string, { model: string; price: { input: num
   "gemini-2.5-flash": { model: "gemini-3.8-flash", price: { input: 0.375, output: 1.88 } },
   "gemini-2.5-flash-lite": { model: "gemini-3.5-flash-lite", price: { input: 0.15, output: 1.25 } },
   "gemini-2.0-flash": { model: "gemini-3.8-flash", price: { input: 0.375, output: 1.88 } },
-  "gemini-2.5-pro": { model: "gemini-3.1-pro", price: { input: 2, output: 12 } },
+  "gemini-2.5-pro": { model: "gemini-3.1-pro-preview", price: { input: 2, output: 12 } },
+  "gemini-3.1-pro": { model: "gemini-3.1-pro-preview", price: { input: 2, output: 12 } },
 };

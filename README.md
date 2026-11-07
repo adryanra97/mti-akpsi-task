@@ -72,7 +72,7 @@ Dipilih Technical Lead di **Pengaturan**:
 - **LLM**: rencana analisis, estimasi penalaran (beberapa sampel untuk mengukur kesepakatan), dan narasi verdict disusun model pilihan melalui LangChain:
   - Claude (Anthropic): `ANTHROPIC_API_KEY`
   - OpenAI atau layanan kompatibel OpenAI: `OPENAI_API_KEY`, opsional `OPENAI_BASE_URL`
-  - Gemini (Google): `GEMINI_API_KEY`
+  - Gemini (Google): `GEMINI_API_KEY` (atau `GOOGLE_API_KEY`), model bawaan `gemini-3.8-flash`
 
 Tombol **Uji koneksi** di Pengaturan memanggil Core Module untuk memastikan API key dan nama model valid.
 

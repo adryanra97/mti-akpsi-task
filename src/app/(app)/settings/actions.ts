@@ -19,7 +19,7 @@ export interface SettingsState {
 }
 
 const PROVIDERS: ProviderId[] = ["anthropic", "openai", "gemini"];
-const ENV_NAME: Record<ProviderId, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY" };
+const ENV_NAME: Record<ProviderId, string> = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY (atau GOOGLE_API_KEY)" };
 
 /**
  * Menyimpan pengaturan Core Module.

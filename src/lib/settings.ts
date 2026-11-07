@@ -26,7 +26,7 @@ export { DEFAULT_SETTINGS, PROVIDER_LABEL, MODEL_SUGGESTIONS } from "./settings-
 export function providerKeyConfigured(p: ProviderId) {
   if (p === "anthropic") return Boolean(process.env.ANTHROPIC_API_KEY);
   if (p === "openai") return Boolean(process.env.OPENAI_API_KEY);
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
 }
 
 /**
