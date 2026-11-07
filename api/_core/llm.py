@@ -13,11 +13,16 @@ ENV_KEY : dict of str
     Nama environment variable API key per penyedia.
 ENV_KEY_CADANGAN : dict of str
     Nama cadangan yang juga dikenali, misalnya ``GOOGLE_API_KEY`` untuk Gemini.
+MODEL_CADANGAN : dict of list of str
+    Model pengganti per penyedia saat model pilihan sedang sibuk (HTTP 503/529).
+JEDA_ULANG_S : float
+    Jeda sebelum mencoba ulang model pilihan yang sedang sibuk, dalam detik.
 """
 from __future__ import annotations
 
 import os
 import threading
+import time
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -94,6 +99,25 @@ class GagalLLM(Exception):
 
 ENV_KEY = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
 ENV_KEY_CADANGAN = {"gemini": "GOOGLE_API_KEY"}  # nama yang dipakai contoh resmi Google
+MODEL_CADANGAN = {"gemini": ["gemini-3.6-flash", "gemini-3.5-flash-lite"], "anthropic": [], "openai": []}
+JEDA_ULANG_S = 2.0
+
+
+def _sibuk(e: Exception) -> bool:
+    """Memeriksa apakah galat berarti model sedang sibuk sementara (bukan salah konfigurasi).
+
+    Parameters
+    ----------
+    e : Exception
+        Galat dari SDK penyedia.
+
+    Returns
+    -------
+    bool
+        ``True`` untuk HTTP 503/529, ``UNAVAILABLE``, ``overloaded``, atau "high demand".
+    """
+    low = str(e).lower()
+    return any(k in low for k in ("503", "529", "unavailable", "overloaded", "high demand", "try again later"))
 
 
 def _pesan_galat(e: Exception, provider: str, model: str) -> str:
@@ -117,6 +141,9 @@ def _pesan_galat(e: Exception, provider: str, model: str) -> str:
     teks = str(e)
     low = teks.lower()
     asli = f" (pesan asli: {teks[:220]})"
+    if _sibuk(e):
+        return (f"Model '{model}' dan model cadangan {provider} sedang sibuk (permintaan tinggi di server penyedia, bukan salah "
+                "konfigurasi). Coba lagi beberapa menit lagi, atau pakai mode Demo untuk sementara.")
     if type(e).__name__ in ("ProxyError", "ConnectError", "ConnectTimeout", "ReadTimeout") or "timed out" in low or "connection" in low:
         return f"Server {provider} tidak dapat dihubungi dari Core Module (jaringan atau batas waktu). Coba lagi.{asli}"
     if "api_key_invalid" in low or "api key not valid" in low or "invalid api key" in low or "incorrect api key" in low:
@@ -162,6 +189,10 @@ class LayananLLM:
         Banyaknya panggilan ke LLM.
     token_masuk, token_keluar : int
         Akumulasi token masukan dan keluaran.
+    model_terpakai : str
+        Model yang terakhir berhasil menjawab (bisa model cadangan).
+    catatan_cadangan : list of str
+        Catatan setiap kali model cadangan dipakai karena model pilihan sibuk.
     """
     def __init__(self, provider: str, model: str, harga: dict, kurs: float):
         """Menyimpan konfigurasi; model chat baru dibuat saat panggilan pertama."""
@@ -172,10 +203,12 @@ class LayananLLM:
         self.pengiriman = 0
         self.token_masuk = 0
         self.token_keluar = 0
-        self._chat = None
+        self._chats: dict = {}
         self._kunci = threading.Lock()
+        self.model_terpakai = model
+        self.catatan_cadangan: list[str] = []
 
-    def _model(self):
+    def _model(self, nama: str | None = None):
         """Membuat (sekali) dan mengembalikan model chat LangChain sesuai penyedia.
 
         Returns
@@ -189,10 +222,15 @@ class LayananLLM:
             Bila API key belum diisi atau penyedia tidak dikenal.
         """
         with self._kunci:
-            return self._buat_model()
+            return self._buat_model(nama or self.model)
 
-    def _buat_model(self):
+    def _buat_model(self, nama: str):
         """Membuat model chat bila belum ada; dipanggil di dalam kunci ``_kunci``.
+
+        Parameters
+        ----------
+        nama : str
+            Nama model pada penyedia.
 
         Returns
         -------
@@ -204,24 +242,25 @@ class LayananLLM:
         GagalLLM
             Bila API key belum diisi atau penyedia tidak dikenal.
         """
-        if self._chat is not None:
-            return self._chat
+        if nama in self._chats:
+            return self._chats[nama]
         key = (os.environ.get(ENV_KEY.get(self.provider, ""), "") or os.environ.get(ENV_KEY_CADANGAN.get(self.provider, ""), "")).strip().strip('"').strip("'")
         if not key:
             raise GagalLLM(f"{ENV_KEY.get(self.provider, 'API key')} belum diisi di environment variable.")
         if self.provider == "anthropic":
             from langchain_anthropic import ChatAnthropic
-            self._chat = ChatAnthropic(model=self.model, api_key=key, max_tokens=1200, timeout=30, max_retries=1)
+            chat = ChatAnthropic(model=nama, api_key=key, max_tokens=1200, timeout=30, max_retries=1)
         elif self.provider == "openai":
             from langchain_openai import ChatOpenAI
-            self._chat = ChatOpenAI(model=self.model, api_key=key, base_url=os.environ.get("OPENAI_BASE_URL") or None,
+            chat = ChatOpenAI(model=nama, api_key=key, base_url=os.environ.get("OPENAI_BASE_URL") or None,
                                     timeout=30, max_retries=1)
         elif self.provider == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
-            self._chat = ChatGoogleGenerativeAI(model=self.model, google_api_key=key, timeout=30, max_retries=1)
+            chat = ChatGoogleGenerativeAI(model=nama, google_api_key=key, timeout=30, max_retries=1)
         else:
             raise GagalLLM(f"Penyedia LLM tidak dikenal: {self.provider}")
-        return self._chat
+        self._chats[nama] = chat
+        return chat
 
     def _catat_pemakaian(self, msg):
         """Menambah hitungan panggilan dan token dari metadata pesan.
@@ -236,6 +275,51 @@ class LayananLLM:
             self.pengiriman += 1
             self.token_masuk += int(usage.get("input_tokens", 0) or 0)
             self.token_keluar += int(usage.get("output_tokens", 0) or 0)
+
+    def _panggil(self, kerja):
+        """Menjalankan panggilan LLM dengan coba ulang dan model cadangan saat model sibuk.
+
+        Model pilihan dicoba dua kali (jeda ``JEDA_ULANG_S``); bila masih sibuk, model pada
+        ``MODEL_CADANGAN`` dicoba berurutan. Galat selain "sibuk" langsung dilaporkan.
+
+        Parameters
+        ----------
+        kerja : callable
+            Fungsi yang menerima model chat LangChain lalu mengembalikan hasil panggilan.
+
+        Returns
+        -------
+        object
+            Hasil ``kerja`` dari model pertama yang berhasil.
+
+        Raises
+        ------
+        GagalLLM
+            Bila semua percobaan gagal; pesan menjelaskan penyebabnya.
+        """
+        calon = [self.model] + [m for m in MODEL_CADANGAN.get(self.provider, []) if m != self.model]
+        galat: Exception | None = None
+        for i, nama in enumerate(calon):
+            for coba in range(2 if i == 0 else 1):
+                try:
+                    hasil = kerja(self._model(nama))
+                except GagalLLM:
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    if not _sibuk(e):
+                        raise GagalLLM(_pesan_galat(e, self.provider, nama)) from e
+                    galat = e
+                    if i == 0 and coba == 0:
+                        time.sleep(JEDA_ULANG_S)
+                    continue
+                self.model_terpakai = nama
+                if nama != self.model:
+                    catatan = f"Model {self.model} sedang sibuk di server penyedia; jawaban LLM memakai model cadangan {nama}."
+                    with self._kunci:
+                        if catatan not in self.catatan_cadangan:
+                            self.catatan_cadangan.append(catatan)
+                return hasil
+        raise GagalLLM(_pesan_galat(galat or Exception("503 UNAVAILABLE"), self.provider, self.model))
 
     def terstruktur(self, skema: type[BaseModel], prompt: str):
         """Memanggil LLM dengan keluaran terstruktur sesuai skema Pydantic.
@@ -257,14 +341,9 @@ class LayananLLM:
         GagalLLM
             Bila panggilan gagal atau keluaran tidak dapat diparsing.
         """
-        try:
-            hasil = self._model().with_structured_output(skema, include_raw=True).invoke(
-                [("system", SISTEM), ("human", prompt)]
-            )
-        except GagalLLM:
-            raise
-        except Exception as e:  # noqa: BLE001
-            raise GagalLLM(_pesan_galat(e, self.provider, self.model)) from e
+        hasil = self._panggil(
+            lambda chat: chat.with_structured_output(skema, include_raw=True).invoke([("system", SISTEM), ("human", prompt)])
+        )
         self._catat_pemakaian(hasil.get("raw"))
         if hasil.get("parsed") is None:
             raise GagalLLM(f"Keluaran model tidak sesuai skema: {str(hasil.get('parsing_error'))[:200]}")
@@ -288,12 +367,7 @@ class LayananLLM:
         GagalLLM
             Bila panggilan gagal.
         """
-        try:
-            msg = self._model().invoke([("system", SISTEM), ("human", prompt)])
-        except GagalLLM:
-            raise
-        except Exception as e:  # noqa: BLE001
-            raise GagalLLM(_pesan_galat(e, self.provider, self.model)) from e
+        msg = self._panggil(lambda chat: chat.invoke([("system", SISTEM), ("human", prompt)]))
         self._catat_pemakaian(msg)
         c = msg.content
         if isinstance(c, list):

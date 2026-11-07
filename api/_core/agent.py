@@ -1156,12 +1156,16 @@ class AgenAnalisis:
         """
         model = self.reg["model"] if self.reg else None
         selesai = datetime.now(timezone.utc)
+        if self.mode_llm:
+            for c in self.llm.catatan_cadangan:
+                if c not in self.peringatan:
+                    self.peringatan.append(c)
         return {
             "idPermintaan": self.p["idPermintaan"],
             "mode": self.mode,
             "modeAnalisis": "llm" if self.mode_llm else "demo",
             "provider": self.llm.provider if self.mode_llm else None,
-            "model": self.llm.model if self.mode_llm else None,
+            "model": self.llm.model_terpakai if self.mode_llm else None,
             "statusPermintaan": self.status,
             "alasanDihentikan": self.dihentikan,
             "waktuDiterima": iso(self.sekarang),

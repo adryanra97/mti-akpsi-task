@@ -189,6 +189,8 @@ async def uji_koneksi(req: Request):
     llm = LayananLLM(data["provider"], data["model"], {"input": 0, "output": 0}, 1)
     try:
         teks = llm.teks('Balas persis dengan satu kata: "siap"')
-        return {"ok": True, "message": f"Tersambung dalam {time.time() - t0:.1f} detik. Jawaban model: \"{teks[:40]}\""}
+        cadangan = (f" Model {llm.model} sedang sibuk; yang menjawab model cadangan {llm.model_terpakai}."
+                    if llm.model_terpakai != llm.model else "")
+        return {"ok": True, "message": f"Tersambung dalam {time.time() - t0:.1f} detik. Jawaban model: \"{teks[:40]}\".{cadangan}"}
     except GagalLLM as e:
         return JSONResponse({"ok": False, "message": str(e)})
